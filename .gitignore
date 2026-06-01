@@ -1,0 +1,12 @@
+node_modules/
+.DS_Store
+.gradle/
+.gradle-cache/
+.npm-cache/
+.android-home/
+.android-sdk/
+.downloads/
+backend.log
+tunnel.log
+data/db.json
+android/app/build/

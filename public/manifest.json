@@ -1,0 +1,9 @@
+{
+  "name": "Gyan Chakra",
+  "short_name": "Gyan Chakra",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#16002f",
+  "theme_color": "#3b0b7a",
+  "icons": []
+}

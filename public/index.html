@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Gyan Chakra Preview</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3b0b7a">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main>
+      <section id="homeScreen" class="screen active splash-screen">
+        <div class="logo-stage">
+          <img class="main-logo" src="assets/gyan-chakra-logo.png" alt="Gyan Chakra">
+        </div>
+        <div class="splash-copy">
+          <h1>Gyan Chakra</h1>
+          <p>Gyan Aapka, Inam Hamara</p>
+        </div>
+        <div class="splash-actions">
+          <button class="gold-button" data-screen="registerScreen">Register</button>
+          <button class="outline-button" data-screen="loginScreen">Login</button>
+        </div>
+        <p class="city-note">Only for Bokaro Steel City</p>
+      </section>
+
+      <section id="loginScreen" class="screen phone-screen">
+        <button class="icon-back" data-screen="homeScreen">Back</button>
+        <div class="auth-card">
+          <h2>Welcome Back!</h2>
+          <p>Login to continue</p>
+          <form id="loginForm" class="form">
+            <label>Mobile Number <input name="phone" placeholder="Enter mobile number" inputmode="numeric" autocomplete="tel" required></label>
+            <label>Password <input name="password" placeholder="Enter password" type="password" autocomplete="current-password" required></label>
+            <button class="forgot-button" id="showResetPasswordBtn" type="button">Forgot Password?</button>
+            <p id="loginMessage" class="form-message"></p>
+            <button type="submit">Login</button>
+          </form>
+          <form id="resetPasswordForm" class="form reset-password-form" hidden>
+            <h3>Reset Password</h3>
+            <label>Mobile Number <input name="phone" placeholder="Registered mobile number" inputmode="numeric" autocomplete="tel" required></label>
+            <label>PIN Code <input name="pincode" placeholder="Your registered PIN code" inputmode="numeric" required></label>
+            <label>New Password <input name="newPassword" placeholder="Create new password" type="password" minlength="4" autocomplete="new-password" required></label>
+            <p id="resetPasswordMessage" class="form-message"></p>
+            <button type="submit">Reset Password</button>
+          </form>
+          <p class="inline-help">Demo user: 9999999999 / password: 123456</p>
+          <button class="text-button" data-screen="registerScreen">Create new account</button>
+        </div>
+        <p class="location-note">Only for Bokaro Steel City</p>
+      </section>
+
+      <section id="registerScreen" class="screen phone-screen">
+        <button class="icon-back" data-screen="homeScreen">Back</button>
+        <div class="auth-card">
+          <h2>Create Your Account</h2>
+          <p>Join Gyan Chakra</p>
+          <form id="registerForm" class="form">
+            <label>Full Name <input name="name" placeholder="Enter full name" autocomplete="name" required></label>
+            <label>Mobile Number <input name="phone" placeholder="Enter mobile number" inputmode="numeric" autocomplete="tel" required></label>
+            <label>Password <input name="password" placeholder="Create password" type="password" minlength="4" autocomplete="new-password" required></label>
+            <label>Address <input name="address" placeholder="Enter address" autocomplete="street-address" required></label>
+            <label>City <input value="Bokaro Steel City" disabled></label>
+            <label>PIN Code <input name="pincode" placeholder="827004" inputmode="numeric" autocomplete="postal-code" required></label>
+            <label>Upload Photo <input name="photoUrl" placeholder="Optional preview URL"></label>
+            <label>Tell us your story <textarea name="bio" maxlength="500" placeholder="What are you studying? What struggles are you facing?" required></textarea></label>
+            <label class="check-row"><input type="checkbox" checked> I confirm that I am a resident of Bokaro Steel City</label>
+            <p id="registerMessage" class="form-message"></p>
+            <button type="submit">Register</button>
+          </form>
+          <button class="text-button" data-screen="loginScreen">Already have an account? Login</button>
+        </div>
+      </section>
+
+      <section id="dashboardScreen" class="screen app-screen">
+        <div class="app-topbar">
+          <div>
+            <h2 id="welcomeTitle">Hello</h2>
+            <p>Bokaro Steel City</p>
+          </div>
+          <button class="bell-button" type="button" id="userLogoutBtn">Logout</button>
+        </div>
+        <div id="liveAlert" class="live-alert">No live quiz right now.</div>
+        <div id="winnerNotice" class="winner-notice">Winners will be announced after review.</div>
+        <div class="progress-card">
+          <h3>Your Progress</h3>
+          <div>
+            <span>Daily Quiz Won</span>
+            <strong id="liveDailyCount">0</strong>
+          </div>
+          <div>
+            <span>Host Quiz Attempted</span>
+            <strong id="hostAttemptCount">0</strong>
+          </div>
+        </div>
+        <p id="dashboardSummary" class="section-label">What do you want to do?</p>
+        <div class="action-list">
+          <article class="app-action daily-card">
+            <div class="action-icon">D</div>
+            <div>
+              <h3>Daily Quiz</h3>
+              <p>2 questions daily, shown one by one at scheduled random times</p>
+            </div>
+            <button data-screen="dailyScreen">Play Now</button>
+          </article>
+          <article class="app-action host-card">
+            <div class="action-icon">H</div>
+            <div>
+              <h3>Play with Host</h3>
+              <p id="hostChoiceText">10 questions to qualify for the hot seat and get a chance to win ₹1,00,000</p>
+            </div>
+            <button id="hostStartBtn" data-screen="hostScreen">Participate</button>
+          </article>
+        </div>
+        <div class="bottom-nav">
+          <button data-screen="dashboardScreen">Home</button>
+          <button data-screen="dailyScreen">My Activity</button>
+          <button data-screen="profileScreen">Profile</button>
+          <button data-screen="dashboardScreen">Help</button>
+        </div>
+      </section>
+
+      <section id="dailyScreen" class="screen app-screen quiz-app-screen">
+        <div class="quiz-topbar">
+          <button class="icon-back" data-screen="dashboardScreen">Back</button>
+          <h2>Daily Quiz</h2>
+          <span class="timer-pill">00:28</span>
+        </div>
+        <p id="dailyQuizSubtitle" class="quiz-subtitle">Today's live question</p>
+        <div id="dailyQuestions" class="question-list"></div>
+      </section>
+
+      <section id="dailyResultScreen" class="screen app-screen result-screen daily-result">
+        <div class="confetti"></div>
+        <div class="result-center">
+          <div class="trophy">🏆</div>
+          <h2 id="dailyResultTitle">Answer Submitted</h2>
+          <p>You answered in</p>
+          <strong id="dailyResultTime">00:18</strong>
+          <p id="dailyResultStatus">Your answer is recorded.</p>
+          <div class="result-prize" id="dailyResultPrize">Under Review</div>
+          <small>Winner is decided after all entries are compared. Fastest correct answer wins ₹500.</small>
+        </div>
+        <button class="wide-action" data-screen="dailyScreen">Next Question (2/2)</button>
+        <button class="text-light dark" data-screen="dashboardScreen">Back to Home</button>
+      </section>
+
+      <section id="hostScreen" class="screen app-screen quiz-app-screen">
+        <div class="quiz-topbar">
+          <button class="icon-back" data-screen="dashboardScreen">Back</button>
+          <h2>Play with Host</h2>
+          <span class="timer-pill">01:15</span>
+        </div>
+        <p class="quiz-subtitle">10 questions challenge</p>
+        <div id="hostQuestions" class="question-list"></div>
+        <button id="submitHostBtn" class="wide-action">Submit Answers</button>
+      </section>
+
+      <section id="hostResultScreen" class="screen app-screen result-screen host-result">
+        <div class="confetti"></div>
+        <div class="result-center">
+          <div class="medal">★</div>
+          <h2>Answers Submitted</h2>
+          <p>Your Play with Host answers were submitted in</p>
+          <strong id="hostResultTime">07:32</strong>
+          <p id="hostResultMessage">Correct answers are recorded. Final selection depends on fastest time.</p>
+          <div class="result-prize">Hot Seat Review</div>
+          <small>Our team will notify eligible players after review.</small>
+        </div>
+        <button class="wide-action" data-screen="dashboardScreen">Back to Home</button>
+      </section>
+
+      <section id="profileScreen" class="screen app-screen">
+        <div class="app-topbar compact">
+          <button class="icon-back" data-screen="dashboardScreen">Back</button>
+          <h2>My Profile</h2>
+          <button class="text-light">Edit</button>
+        </div>
+        <div class="profile-card">
+          <div class="avatar">RK</div>
+          <div>
+            <h3 id="profileName">Demo User</h3>
+            <p>Bokaro Steel City<br>827004</p>
+          </div>
+        </div>
+        <div class="profile-info">
+          <h3>My Information</h3>
+          <p id="profileSummary">Login or register to see your profile.</p>
+        </div>
+        <div class="profile-stats">
+          <div><span>Daily Quiz Won</span><strong id="profileDailyWon">0</strong></div>
+          <div><span>Host Quiz Attempted</span><strong id="profileHostAttempt">0</strong></div>
+        </div>
+        <button class="wide-action" id="profileLogoutBtn">Logout</button>
+        <div class="bottom-nav">
+          <button data-screen="dashboardScreen">Home</button>
+          <button data-screen="dailyScreen">My Activity</button>
+          <button data-screen="profileScreen">Profile</button>
+          <button data-screen="dashboardScreen">Help</button>
+        </div>
+      </section>
+
+      <section id="adminLoginScreen" class="screen phone-screen">
+        <button class="icon-back" data-screen="homeScreen">Back</button>
+        <div class="auth-card">
+          <h2>Agent Login</h2>
+          <p>Preview PIN: 1234</p>
+          <form id="adminLoginForm" class="form">
+            <label>Agent PIN <input name="pin" value="1234" required></label>
+            <button type="submit">Open Agent Panel</button>
+          </form>
+        </div>
+      </section>
+
+      <section id="adminScreen" class="screen admin-screen">
+        <aside class="admin-sidebar">
+          <h2>Gyan Chakra Admin Panel</h2>
+          <button data-admin-view="dashboard">Dashboard</button>
+          <button data-admin-view="daily">Daily Quiz Questions</button>
+          <button data-admin-view="host">Host Quiz Questions</button>
+          <button data-admin-view="users">Users</button>
+          <button data-admin-view="winners">Winners</button>
+          <button data-admin-view="payouts">Payouts</button>
+          <button id="resetDemoBtn">Reset Demo</button>
+        </aside>
+        <div class="admin-main">
+          <div class="admin-head">
+            <div>
+              <p class="section-label">Agent Workspace</p>
+              <h1>Dashboard</h1>
+            </div>
+            <button class="outline-dark" data-screen="homeScreen">Logout</button>
+          </div>
+          <div class="admin-metrics" data-admin-section="dashboard payouts">
+            <div><span>Total Users</span><strong id="adminUsers">0</strong></div>
+            <div><span>Daily Winners</span><strong id="adminDailyWinners">0</strong></div>
+            <div><span>Host Qualified</span><strong id="adminHostQualified">0</strong></div>
+            <div><span>Total Payout</span><strong id="adminPayout">₹0</strong></div>
+          </div>
+          <div class="admin-grid">
+            <div class="admin-panel" data-admin-section="dashboard daily host">
+              <h3>Upload / Manage Questions</h3>
+              <form id="questionForm" class="form">
+                <input name="id" type="hidden">
+                <label>Quiz Type
+                  <select name="type">
+                    <option value="daily">Daily Quiz</option>
+                    <option value="host">Play with Host</option>
+                  </select>
+                </label>
+                <label class="schedule-field">Live Date and Time
+                  <input name="scheduledAt" type="datetime-local" required>
+                </label>
+                <label class="check-row"><input name="liveNow" type="checkbox"> Make live now</label>
+                <label>Question <textarea name="text" required>What is the famous steel city in Jharkhand?</textarea></label>
+                <label>Options, one per line <textarea name="options" required>Bokaro Steel City
+Ranchi
+Dhanbad
+Patna</textarea></label>
+                <label>Correct Option Number <input name="correctIndex" type="number" min="1" value="1" required></label>
+                <label class="daily-prize-field">Prize for Daily Quiz <input name="prize" type="number" value="500"></label>
+                <button type="submit">Publish Question</button>
+                <button class="outline-dark" id="clearQuestionFormBtn" type="button">Clear Form</button>
+              </form>
+            </div>
+            <div class="admin-panel wide" data-admin-section="daily">
+              <h3>Daily Quiz Questions</h3>
+              <p>Select a date, schedule two Daily Quiz questions at separate times, and review winners by date.</p>
+              <div class="host-date-picker">
+                <label>Post by Date <input id="dailyDateSelect" type="date"></label>
+                <button id="todayDailyDateBtn" type="button">Today</button>
+                <button id="tomorrowDailyDateBtn" type="button">Tomorrow</button>
+              </div>
+              <div class="host-set-summary" id="dailySetSummary"></div>
+              <div id="dailyQuestionManager" class="results"></div>
+              <h3>Daily Schedule by Date</h3>
+              <div id="dailyScheduleByDate" class="results"></div>
+            </div>
+            <div class="admin-panel wide" data-admin-section="host">
+              <h3>Play with Host Questions</h3>
+              <p>Select a date, add 10 host questions for that date, then schedule or make that date's set live.</p>
+              <div class="host-date-picker">
+                <label>Post by Date <input id="hostDateSelect" type="date"></label>
+                <button id="todayHostDateBtn" type="button">Today</button>
+                <button id="tomorrowHostDateBtn" type="button">Tomorrow</button>
+              </div>
+              <div id="hostSetSummary" class="host-set-summary"></div>
+              <div class="host-set-actions">
+                <button id="addHostQuestionBtn" type="button">Add Host Question</button>
+                <label>Set Live Time <input id="hostSetTime" type="datetime-local"></label>
+                <button id="scheduleHostSetBtn" type="button">Schedule 10 Questions</button>
+                <button id="makeHostSetLiveBtn" type="button">Make 10 Live Now</button>
+              </div>
+              <div id="hostQuestionManager" class="results"></div>
+              <h3>Host Schedule by Date</h3>
+              <p>Review which host questions are scheduled on each date and edit them anytime.</p>
+              <div id="hostScheduleByDate" class="results"></div>
+            </div>
+            <div class="admin-panel" data-admin-section="dashboard winners payouts">
+              <h3>Recent Winners</h3>
+              <div id="dailyWinners" class="results"></div>
+            </div>
+            <div class="admin-panel wide" data-admin-section="dashboard winners">
+              <h3>Daily Answer Log</h3>
+              <div id="dailyAnswerLog" class="results"></div>
+            </div>
+            <div class="admin-panel" data-admin-section="dashboard winners">
+              <h3>Host Shortlist</h3>
+              <div id="hostLeaderboard" class="results"></div>
+            </div>
+            <div class="admin-panel wide" data-admin-section="dashboard winners">
+              <h3>Host Attempts</h3>
+              <div id="hostAttemptLog" class="results"></div>
+            </div>
+            <div class="admin-panel wide" data-admin-section="dashboard users">
+              <h3>Registered Users</h3>
+              <div class="user-admin-summary" id="userAdminSummary"></div>
+              <div class="user-filter-row">
+                <label>Search Users <input id="userSearchInput" placeholder="Name, mobile, PIN, address"></label>
+                <label>View
+                  <select id="userDateFilter">
+                    <option value="all">All users</option>
+                    <option value="today">Registered today</option>
+                    <option value="loginToday">Logged in today</option>
+                  </select>
+                </label>
+              </div>
+              <div id="registeredUsers" class="results"></div>
+            </div>
+            <div class="admin-panel wide" data-admin-section="dashboard daily">
+              <h3>Daily Schedule</h3>
+              <p>Prepare questions for coming days. Players only see questions when date and time arrives.</p>
+              <div id="dailySchedule" class="results"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status"></div>
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

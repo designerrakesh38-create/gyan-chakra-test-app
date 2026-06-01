@@ -5,10 +5,14 @@ const crypto = require("crypto");
 
 const PORT = Number(process.env.PORT || 5292);
 const HOST = process.env.HOST || "0.0.0.0";
-const ADMIN_PIN = String(process.env.ADMIN_PIN || "1234");
+const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || "GyanChakra-9VC1vye0EEi3A34U01wI28vV!");
+const ADMIN_SESSION_HOURS = Number(process.env.ADMIN_SESSION_HOURS || 12);
+const ALLOW_LEGACY_ADMIN_PIN = process.env.ALLOW_LEGACY_ADMIN_PIN === "true";
+const ADMIN_PIN = String(process.env.ADMIN_PIN || "");
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
 const PUBLIC_DIR = path.join(__dirname, "public");
+const adminLoginAttempts = new Map();
 
 const allowedPincodes = new Set(["827001", "827003", "827004", "827006", "827009", "827010", "827011", "827012", "827013"]);
 
@@ -30,13 +34,44 @@ function normalizePassword(value) {
 }
 
 function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.pbkdf2Sync(normalizePassword(password), salt, 210000, 32, "sha256").toString("hex");
+  return `pbkdf2$210000$${salt}$${hash}`;
+}
+
+function legacyHashPassword(password) {
   return crypto.createHash("sha256").update(normalizePassword(password)).digest("hex");
+}
+
+function safeEqual(a, b) {
+  const left = Buffer.from(String(a));
+  const right = Buffer.from(String(b));
+  return left.length === right.length && crypto.timingSafeEqual(left, right);
+}
+
+function verifyHash(storedHash, password) {
+  if (!storedHash) return false;
+  if (storedHash.startsWith("pbkdf2$")) {
+    const [, iterations, salt, expected] = storedHash.split("$");
+    if (!iterations || !salt || !expected) return false;
+    const actual = crypto.pbkdf2Sync(normalizePassword(password), salt, Number(iterations), 32, "sha256").toString("hex");
+    return safeEqual(actual, expected);
+  }
+  return safeEqual(storedHash, legacyHashPassword(password));
 }
 
 function verifyPassword(user, password) {
   const normalized = normalizePassword(password);
-  if (user.passwordHash) return user.passwordHash === hashPassword(normalized);
+  if (user.passwordHash) return verifyHash(user.passwordHash, normalized);
   return normalizePassword(user.password || "123456") === normalized;
+}
+
+function verifyAdminPassword(password) {
+  return safeEqual(normalizePassword(password), ADMIN_PASSWORD);
+}
+
+function hashToken(token) {
+  return crypto.createHash("sha256").update(String(token)).digest("hex");
 }
 
 function todayKey(date = new Date()) {
@@ -156,6 +191,15 @@ function readDb() {
     db.hostWinnerSelections = {};
     changed = true;
   }
+  if (!Array.isArray(db.adminSessions)) {
+    db.adminSessions = [];
+    changed = true;
+  }
+  const activeSessions = db.adminSessions.filter(session => session.expiresAt && new Date(session.expiresAt) > new Date());
+  if (activeSessions.length !== db.adminSessions.length) {
+    db.adminSessions = activeSessions;
+    changed = true;
+  }
   db.users.forEach(user => {
     const phone = normalizePhone(user.phone);
     if (user.phone !== phone) {
@@ -196,13 +240,70 @@ function send(res, status, data, headers = {}) {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Admin-Token",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
     ...headers
   });
   res.end(JSON.stringify(data));
 }
 
-function isAdminRequest(req, body = {}) {
+function getClientIp(req) {
+  return String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown").split(",")[0].trim();
+}
+
+function loginBlocked(req) {
+  const key = getClientIp(req);
+  const record = adminLoginAttempts.get(key);
+  if (!record) return false;
+  if (record.blockedUntil && record.blockedUntil > Date.now()) return true;
+  if (record.blockedUntil && record.blockedUntil <= Date.now()) adminLoginAttempts.delete(key);
+  return false;
+}
+
+function recordAdminLogin(req, ok) {
+  const key = getClientIp(req);
+  if (ok) {
+    adminLoginAttempts.delete(key);
+    return;
+  }
+  const record = adminLoginAttempts.get(key) || { count: 0, blockedUntil: 0 };
+  record.count += 1;
+  if (record.count >= 5) record.blockedUntil = Date.now() + 15 * 60 * 1000;
+  adminLoginAttempts.set(key, record);
+}
+
+function createAdminSession(db) {
+  const token = crypto.randomBytes(32).toString("base64url");
+  const expiresAt = new Date(Date.now() + ADMIN_SESSION_HOURS * 60 * 60 * 1000).toISOString();
+  db.adminSessions = (db.adminSessions || []).filter(session => session.expiresAt && new Date(session.expiresAt) > new Date());
+  db.adminSessions.push({
+    id: id("adm"),
+    tokenHash: hashToken(token),
+    createdAt: now(),
+    expiresAt
+  });
+  return { token, expiresAt };
+}
+
+function getAdminToken(req, body = {}) {
+  try {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const authorization = String(req.headers.authorization || "");
+    if (authorization.toLowerCase().startsWith("bearer ")) return authorization.slice(7).trim();
+    return String(req.headers["x-admin-token"] || body.adminToken || url.searchParams.get("adminToken") || "");
+  } catch {
+    return String(req.headers["x-admin-token"] || body.adminToken || "");
+  }
+}
+
+function isAdminRequest(req, body = {}, db = null) {
+  const token = getAdminToken(req, body);
+  const database = db || readDb();
+  if (token && database.adminSessions?.some(session => safeEqual(session.tokenHash, hashToken(token)) && new Date(session.expiresAt) > new Date())) {
+    return true;
+  }
+  if (!ALLOW_LEGACY_ADMIN_PIN || !ADMIN_PIN) return false;
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
     return String(req.headers["x-admin-pin"] || body.adminPin || url.searchParams.get("adminPin") || "") === ADMIN_PIN;
@@ -458,7 +559,7 @@ async function handleApi(req, res) {
 
   if (req.method === "GET" && url.pathname === "/api/bootstrap") {
     const userId = url.searchParams.get("userId");
-    const admin = isAdminRequest(req);
+    const admin = isAdminRequest(req, {}, db);
     return send(res, 200, {
       users: admin ? db.users.map(adminUser) : [],
       adminStats: admin ? adminStats(db) : null,
@@ -483,6 +584,21 @@ async function handleApi(req, res) {
       dailyAnswerRows: admin ? dailyAnswerRows(db) : [],
       hostAttemptRows: admin ? hostAttemptRows(db) : [],
       hostAlreadyQualified: userId ? hasHostQualified(db, userId) : false
+    });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/admin/login") {
+    if (loginBlocked(req)) return send(res, 429, { error: "Too many wrong attempts. Please try again after 15 minutes." });
+    const body = await parseBody(req);
+    const ok = verifyAdminPassword(body.password);
+    recordAdminLogin(req, ok);
+    if (!ok) return send(res, 401, { error: "Admin password is incorrect." });
+    const session = createAdminSession(db);
+    writeDb(db);
+    return send(res, 200, {
+      adminToken: session.token,
+      expiresAt: session.expiresAt,
+      message: "Admin login successful."
     });
   }
 
@@ -606,7 +722,7 @@ async function handleApi(req, res) {
 
   if (req.method === "POST" && url.pathname === "/api/admin/question") {
     const body = await parseBody(req);
-    if (!isAdminRequest(req, body)) return send(res, 403, { error: "Admin PIN required." });
+    if (!isAdminRequest(req, body, db)) return send(res, 403, { error: "Admin login required." });
     const target = body.type === "host" ? db.hostQuestions : db.dailyQuestions;
     if (!body.text || !Array.isArray(body.options) || body.options.length < 2) {
       return send(res, 400, { error: "Question text and at least two options are required." });
@@ -642,7 +758,7 @@ async function handleApi(req, res) {
 
   if (req.method === "POST" && url.pathname === "/api/admin/question/delete") {
     const body = await parseBody(req);
-    if (!isAdminRequest(req, body)) return send(res, 403, { error: "Admin PIN required." });
+    if (!isAdminRequest(req, body, db)) return send(res, 403, { error: "Admin login required." });
     const target = body.type === "host" ? db.hostQuestions : db.dailyQuestions;
     const index = target.findIndex(question => question.id === body.id);
     if (index < 0) return send(res, 404, { error: "Question not found." });
@@ -653,7 +769,7 @@ async function handleApi(req, res) {
 
   if (req.method === "POST" && url.pathname === "/api/admin/question/move") {
     const body = await parseBody(req);
-    if (!isAdminRequest(req, body)) return send(res, 403, { error: "Admin PIN required." });
+    if (!isAdminRequest(req, body, db)) return send(res, 403, { error: "Admin login required." });
     const target = body.type === "host" ? db.hostQuestions : db.dailyQuestions;
     const index = target.findIndex(question => question.id === body.id);
     const next = body.direction === "up" ? index - 1 : index + 1;
@@ -666,7 +782,7 @@ async function handleApi(req, res) {
 
   if (req.method === "POST" && url.pathname === "/api/admin/host-set/schedule") {
     const body = await parseBody(req);
-    if (!isAdminRequest(req, body)) return send(res, 403, { error: "Admin PIN required." });
+    if (!isAdminRequest(req, body, db)) return send(res, 403, { error: "Admin login required." });
     const questions = Array.isArray(body.questionIds) && body.questionIds.length
       ? body.questionIds.map(questionId => db.hostQuestions.find(question => question.id === questionId)).filter(Boolean)
       : db.hostQuestions.slice(0, 10);
@@ -682,7 +798,7 @@ async function handleApi(req, res) {
 
   if (req.method === "POST" && url.pathname === "/api/admin/notify") {
     const body = await parseBody(req);
-    if (!isAdminRequest(req, body)) return send(res, 403, { error: "Admin PIN required." });
+    if (!isAdminRequest(req, body, db)) return send(res, 403, { error: "Admin login required." });
     const target = body.type === "host"
       ? db.hostAttempts.find(attempt => attempt.id === body.id)
       : db.dailyAnswers.find(answer => answer.id === body.id);
@@ -694,7 +810,7 @@ async function handleApi(req, res) {
 
   if (req.method === "POST" && url.pathname === "/api/admin/select-winner") {
     const body = await parseBody(req);
-    if (!isAdminRequest(req, body)) return send(res, 403, { error: "Admin PIN required." });
+    if (!isAdminRequest(req, body, db)) return send(res, 403, { error: "Admin login required." });
     if (body.type === "host") {
       const attempt = db.hostAttempts.find(item => item.id === body.id);
       if (!attempt) return send(res, 404, { error: "Host attempt not found." });
@@ -718,7 +834,7 @@ async function handleApi(req, res) {
 
   if (req.method === "POST" && url.pathname === "/api/admin/reset-demo") {
     const body = await parseBody(req);
-    if (!isAdminRequest(req, body)) return send(res, 403, { error: "Admin PIN required." });
+    if (!isAdminRequest(req, body, db)) return send(res, 403, { error: "Admin login required." });
     writeDb(seed);
     return send(res, 200, { ok: true });
   }

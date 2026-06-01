@@ -21,7 +21,7 @@ const state = {
   dailyManageDate: new Date().toISOString().slice(0, 10),
   hostManageDate: new Date().toISOString().slice(0, 10),
   hostBulkDate: new Date().toISOString().slice(0, 10),
-  adminPin: null
+  adminToken: null
 };
 
 const $ = selector => document.querySelector(selector);
@@ -397,7 +397,12 @@ async function offlineApi(path, options = {}) {
   const db = readOfflineDb();
 
   if (url.pathname === "/api/bootstrap") {
-    return offlineBootstrap(url.searchParams.get("userId"), url.searchParams.get("adminPin") === "1234");
+    return offlineBootstrap(url.searchParams.get("userId"), body.adminToken === "offline-admin-token");
+  }
+
+  if (url.pathname === "/api/admin/login") {
+    if (normalizePassword(body.password).length < 12) throw new Error("Admin password is incorrect.");
+    return { adminToken: "offline-admin-token", message: "Admin login successful." };
   }
 
   if (url.pathname === "/api/register") {
@@ -503,7 +508,7 @@ async function offlineApi(path, options = {}) {
   }
 
   if (url.pathname === "/api/admin/question") {
-    if (String(body.adminPin || "") !== "1234") throw new Error("Admin PIN required.");
+    if (String(body.adminToken || "") !== "offline-admin-token") throw new Error("Admin login required.");
     const scheduledAt = new Date(body.scheduledAt || isoNow()).toISOString();
     if (body.type !== "host") {
       const day = offlineDayKey(new Date(scheduledAt));
@@ -529,7 +534,7 @@ async function offlineApi(path, options = {}) {
   }
 
   if (url.pathname === "/api/admin/question/delete") {
-    if (String(body.adminPin || "") !== "1234") throw new Error("Admin PIN required.");
+    if (String(body.adminToken || "") !== "offline-admin-token") throw new Error("Admin login required.");
     const target = body.type === "host" ? db.hostQuestions : db.dailyQuestions;
     const index = target.findIndex(question => question.id === body.id);
     if (index < 0) throw new Error("Question not found.");
@@ -539,7 +544,7 @@ async function offlineApi(path, options = {}) {
   }
 
   if (url.pathname === "/api/admin/question/move") {
-    if (String(body.adminPin || "") !== "1234") throw new Error("Admin PIN required.");
+    if (String(body.adminToken || "") !== "offline-admin-token") throw new Error("Admin login required.");
     const target = body.type === "host" ? db.hostQuestions : db.dailyQuestions;
     const index = target.findIndex(question => question.id === body.id);
     const next = body.direction === "up" ? index - 1 : index + 1;
@@ -551,7 +556,7 @@ async function offlineApi(path, options = {}) {
   }
 
   if (url.pathname === "/api/admin/host-set/schedule") {
-    if (String(body.adminPin || "") !== "1234") throw new Error("Admin PIN required.");
+    if (String(body.adminToken || "") !== "offline-admin-token") throw new Error("Admin login required.");
     const questions = Array.isArray(body.questionIds) && body.questionIds.length
       ? body.questionIds.map(questionId => db.hostQuestions.find(question => question.id === questionId)).filter(Boolean)
       : db.hostQuestions.slice(0, 10);
@@ -566,7 +571,7 @@ async function offlineApi(path, options = {}) {
   }
 
   if (url.pathname === "/api/admin/notify") {
-    if (String(body.adminPin || "") !== "1234") throw new Error("Admin PIN required.");
+    if (String(body.adminToken || "") !== "offline-admin-token") throw new Error("Admin login required.");
     const target = body.type === "host"
       ? db.hostAttempts.find(attempt => attempt.id === body.id)
       : db.dailyAnswers.find(answer => answer.id === body.id);
@@ -577,7 +582,7 @@ async function offlineApi(path, options = {}) {
   }
 
   if (url.pathname === "/api/admin/select-winner") {
-    if (String(body.adminPin || "") !== "1234") throw new Error("Admin PIN required.");
+    if (String(body.adminToken || "") !== "offline-admin-token") throw new Error("Admin login required.");
     if (body.type === "host") {
       const attempt = db.hostAttempts.find(item => item.id === body.id);
       if (!attempt) throw new Error("Host attempt not found.");
@@ -601,7 +606,7 @@ async function offlineApi(path, options = {}) {
   }
 
   if (url.pathname === "/api/admin/reset-demo") {
-    if (String(body.adminPin || "") !== "1234") throw new Error("Admin PIN required.");
+    if (String(body.adminToken || "") !== "offline-admin-token") throw new Error("Admin login required.");
     const fresh = createOfflineDb();
     writeOfflineDb(fresh);
     return { ok: true };
@@ -631,7 +636,11 @@ async function api(path, options = {}) {
   try {
     const res = await fetch(target, {
       ...options,
-      headers: { "Content-Type": "application/json", ...(options.headers || {}) }
+      headers: {
+        "Content-Type": "application/json",
+        ...(state.adminToken ? { Authorization: `Bearer ${state.adminToken}` } : {}),
+        ...(options.headers || {})
+      }
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Something went wrong");
@@ -1190,7 +1199,7 @@ async function saveHostBulkQuestions() {
       if (!text || options.length < 2) throw new Error(`Fill question ${slot} and at least 2 options.`);
       if (correctIndex >= options.length) throw new Error(`Correct option for question ${slot} must have option text.`);
       const payload = {
-        adminPin: state.adminPin,
+        adminToken: state.adminToken,
         type: "host",
         id: card.dataset.questionId || "",
         text,
@@ -1204,7 +1213,7 @@ async function saveHostBulkQuestions() {
     }
     await api("/api/admin/host-set/schedule", {
       method: "POST",
-      body: JSON.stringify({ adminPin: state.adminPin, scheduledAt, questionIds: savedIds })
+      body: JSON.stringify({ adminToken: state.adminToken, scheduledAt, questionIds: savedIds })
     });
     state.hostManageDate = date;
     if ($("#hostDateSelect")) $("#hostDateSelect").value = date;
@@ -1327,7 +1336,6 @@ function renderHostScheduleByDate() {
 async function refresh() {
   const params = new URLSearchParams();
   if (state.activeUser) params.set("userId", state.activeUser.id);
-  if (state.adminPin) params.set("adminPin", state.adminPin);
   const qs = params.toString() ? `?${params}` : "";
   const data = await api(`/api/bootstrap${qs}`);
   $("#adminUsers").textContent = data.userCount ?? data.users.length;
@@ -1437,12 +1445,26 @@ bind("#resetPasswordForm", "submit", async event => {
 
 bind("#adminLoginForm", "submit", async event => {
   event.preventDefault();
-  const pin = new FormData(event.currentTarget).get("pin");
-  if (pin !== "1234") return toast("Wrong preview PIN.");
-  state.adminPin = pin;
-  await refresh();
-  showAdminView("dashboard");
-  showScreen("adminScreen");
+  const formEl = event.currentTarget;
+  const submit = formEl.querySelector("button[type='submit']");
+  const password = new FormData(formEl).get("password");
+  submit.disabled = true;
+  try {
+    const data = await api("/api/admin/login", {
+      method: "POST",
+      body: JSON.stringify({ password })
+    });
+    state.adminToken = data.adminToken;
+    await refresh();
+    formEl.reset();
+    toast(data.message || "Admin login successful.");
+    showAdminView("dashboard");
+    showScreen("adminScreen");
+  } catch (error) {
+    toast(error.message);
+  } finally {
+    submit.disabled = false;
+  }
 });
 
 bind("#questionForm", "submit", async event => {
@@ -1455,7 +1477,7 @@ bind("#questionForm", "submit", async event => {
   payload.prize = Number(payload.prize || 500);
   if (payload.liveNow) payload.scheduledAt = new Date().toISOString();
   else if (payload.scheduledAt) payload.scheduledAt = new Date(payload.scheduledAt).toISOString();
-  payload.adminPin = state.adminPin;
+  payload.adminToken = state.adminToken;
   try {
     await api("/api/admin/question", { method: "POST", body: JSON.stringify(payload) });
     toast(payload.id ? "Question updated." : "Question published.");
@@ -1501,7 +1523,7 @@ document.addEventListener("click", async event => {
     try {
       await api("/api/admin/notify", {
         method: "POST",
-        body: JSON.stringify({ adminPin: state.adminPin, type: notify.dataset.type, id: notify.dataset.notifyRecord })
+        body: JSON.stringify({ adminToken: state.adminToken, type: notify.dataset.type, id: notify.dataset.notifyRecord })
       });
       toast("Marked as notified.");
       await refresh();
@@ -1515,7 +1537,7 @@ document.addEventListener("click", async event => {
     try {
       await api("/api/admin/select-winner", {
         method: "POST",
-        body: JSON.stringify({ adminPin: state.adminPin, type: selectWinner.dataset.type, id: selectWinner.dataset.selectWinner })
+        body: JSON.stringify({ adminToken: state.adminToken, type: selectWinner.dataset.type, id: selectWinner.dataset.selectWinner })
       });
       toast(selectWinner.dataset.type === "host" ? "Host candidate selected." : "Daily winner selected.");
       await refresh();
@@ -1561,11 +1583,11 @@ document.addEventListener("click", async event => {
       return;
     }
     if (remove) {
-      await api("/api/admin/question/delete", { method: "POST", body: JSON.stringify({ adminPin: state.adminPin, type, id }) });
+      await api("/api/admin/question/delete", { method: "POST", body: JSON.stringify({ adminToken: state.adminToken, type, id }) });
       toast("Question deleted.");
     }
     if (move) {
-      await api("/api/admin/question/move", { method: "POST", body: JSON.stringify({ adminPin: state.adminPin, type, id, direction: button.dataset.direction }) });
+      await api("/api/admin/question/move", { method: "POST", body: JSON.stringify({ adminToken: state.adminToken, type, id, direction: button.dataset.direction }) });
       toast("Question reordered.");
     }
     await refresh();
@@ -1678,7 +1700,7 @@ async function scheduleHostSet(liveNow = false) {
   try {
     await api("/api/admin/host-set/schedule", {
       method: "POST",
-      body: JSON.stringify({ adminPin: state.adminPin, scheduledAt, questionIds: selected.map(question => question.id) })
+      body: JSON.stringify({ adminToken: state.adminToken, scheduledAt, questionIds: selected.map(question => question.id) })
     });
     toast(liveNow ? "Host 10-question set is live now." : "Host 10-question set scheduled.");
     await refresh();
@@ -1731,8 +1753,19 @@ function logoutUser() {
 bind("#userLogoutBtn", "click", logoutUser);
 bind("#profileLogoutBtn", "click", logoutUser);
 
+bind("#adminLogoutBtn", "click", () => {
+  state.adminToken = null;
+  state.users = [];
+  state.allDailyQuestions = [];
+  state.allHostQuestions = [];
+  state.dailyAnswerRows = [];
+  state.hostAttemptRows = [];
+  toast("Admin logged out.");
+  showScreen("homeScreen");
+});
+
 bind("#resetDemoBtn", "click", async () => {
-  await api("/api/admin/reset-demo", { method: "POST", body: JSON.stringify({ adminPin: state.adminPin }) });
+  await api("/api/admin/reset-demo", { method: "POST", body: JSON.stringify({ adminToken: state.adminToken }) });
   state.activeUser = null;
   state.hostAnswers.clear();
   state.hostStartedAt = Date.now();
@@ -1819,7 +1852,7 @@ refresh().then(() => {
 }).catch(error => toast(error.message));
 
 setInterval(async () => {
-  if (!state.activeUser && !state.adminPin) return;
+  if (!state.activeUser && !state.adminToken) return;
   const activeScreen = document.querySelector(".screen.active")?.id;
   if (["dailyScreen", "hostScreen"].includes(activeScreen)) return;
   const previous = state.lastLiveSignature;

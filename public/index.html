@@ -205,9 +205,8 @@
         <button class="icon-back" data-screen="homeScreen">Back</button>
         <div class="auth-card">
           <h2>Agent Login</h2>
-          <p>Preview PIN: 1234</p>
           <form id="adminLoginForm" class="form">
-            <label>Agent PIN <input name="pin" value="1234" required></label>
+            <label>Admin Password <input name="password" type="password" autocomplete="current-password" required></label>
             <button type="submit">Open Agent Panel</button>
           </form>
         </div>
@@ -230,7 +229,7 @@
               <p class="section-label">Agent Workspace</p>
               <h1>Dashboard</h1>
             </div>
-            <button class="outline-dark" data-screen="homeScreen">Logout</button>
+            <button class="outline-dark" id="adminLogoutBtn">Logout</button>
           </div>
           <div class="admin-metrics" data-admin-section="dashboard payouts">
             <div><span>Total Users</span><strong id="adminUsers">0</strong></div>

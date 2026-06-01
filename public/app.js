@@ -647,6 +647,7 @@ async function api(path, options = {}) {
     return data;
   } catch (error) {
     if (API_BASE_URL) throw error;
+    if (!PACKAGED_APP) throw error;
     return offlineApi(path, options);
   }
 }
@@ -1456,6 +1457,7 @@ bind("#adminLoginForm", "submit", async event => {
     });
     state.adminToken = data.adminToken;
     await refresh();
+    if (!state.adminStats) throw new Error("Admin session could not be verified.");
     formEl.reset();
     toast(data.message || "Admin login successful.");
     showAdminView("dashboard");

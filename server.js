@@ -544,7 +544,11 @@ function serveStatic(req, res) {
     ".css": "text/css; charset=utf-8",
     ".js": "application/javascript; charset=utf-8"
   }[ext] || "application/octet-stream";
-  res.writeHead(200, { "Content-Type": type });
+  res.writeHead(200, {
+    "Content-Type": type,
+    "Cache-Control": ext === ".apk" ? "public, max-age=3600" : "no-store",
+    "X-Content-Type-Options": "nosniff"
+  });
   fs.createReadStream(filePath).pipe(res);
 }
 

@@ -8,7 +8,9 @@ if (!url || !/^https?:\/\/[^/]+/.test(url)) {
 }
 
 const cleanUrl = url.replace(/\/$/, "");
-const config = `if (!["127.0.0.1", "localhost"].includes(window.location.hostname)) {
+const config = `if (
+  !["127.0.0.1", "localhost", ${JSON.stringify(new URL(cleanUrl).hostname)}].includes(window.location.hostname)
+) {
   window.GYAN_API_BASE_URL = ${JSON.stringify(cleanUrl)};
 }
 `;

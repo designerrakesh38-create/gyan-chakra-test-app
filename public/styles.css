@@ -946,6 +946,70 @@ select:focus {
   font-weight: 800;
 }
 
+.host-bulk-builder {
+  border: 1px solid rgba(90, 24, 159, 0.18);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #fffdf8, #fbf8ff);
+  padding: 16px;
+  margin: 14px 0;
+}
+
+.bulk-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.bulk-head h3,
+.bulk-head p {
+  margin: 0;
+}
+
+.bulk-head p {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.bulk-question-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.bulk-question-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  padding: 14px;
+  box-shadow: 0 10px 22px rgba(53, 16, 117, 0.06);
+}
+
+.bulk-question-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.bulk-question-title span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.bulk-options-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bulk-actions {
+  margin-top: 14px;
+}
+
 .user-filter-row {
   display: grid;
   grid-template-columns: minmax(260px, 1fr) 220px;
@@ -1074,8 +1138,13 @@ select:focus {
   .admin-grid,
   .user-admin-summary,
   .user-filter-row,
-  .user-detail-card {
+  .user-detail-card,
+  .bulk-options-grid {
     grid-template-columns: 1fr;
+  }
+
+  .bulk-head {
+    display: grid;
   }
 
   .admin-panel.wide {

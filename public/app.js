@@ -20,6 +20,7 @@ const state = {
   lastLiveSignature: "",
   dailyManageDate: new Date().toISOString().slice(0, 10),
   hostManageDate: new Date().toISOString().slice(0, 10),
+  hostBulkDate: new Date().toISOString().slice(0, 10),
   adminPin: null
 };
 
@@ -658,6 +659,15 @@ function formatDateTime(value) {
   }).format(new Date(value));
 }
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function setActiveUser(user) {
   state.activeUser = user;
   if (user) localStorage.setItem(USER_SESSION_KEY, JSON.stringify(user));
@@ -1085,6 +1095,127 @@ function selectedHostQuestions() {
   return state.allHostQuestions.filter(question => questionDateKey(question) === state.hostManageDate);
 }
 
+function selectedHostBulkQuestions() {
+  return state.allHostQuestions
+    .filter(question => questionDateKey(question) === state.hostBulkDate)
+    .sort((a, b) => new Date(a.scheduledAt || 0) - new Date(b.scheduledAt || 0));
+}
+
+function defaultHostBulkTime(dateKey = state.hostBulkDate) {
+  return new Date(`${dateKey}T20:00:00`).toISOString().slice(0, 16);
+}
+
+function renderHostBulkBuilder() {
+  const wrap = $("#hostBulkQuestions");
+  if (!wrap) return;
+  const selected = selectedHostBulkQuestions();
+  wrap.innerHTML = Array.from({ length: 10 }, (_, index) => {
+    const question = selected[index];
+    const options = question?.options || ["", "", "", ""];
+    return `
+      <article class="bulk-question-card" data-bulk-slot="${index + 1}" data-question-id="${question?.id || ""}">
+        <div class="bulk-question-title">
+          <strong>Question ${index + 1}</strong>
+          <span>${question ? "Existing question loaded" : "New question"}</span>
+        </div>
+        <label>Question
+          <textarea data-bulk-field="text" placeholder="Enter host question ${index + 1}" required>${escapeHtml(question?.text || "")}</textarea>
+        </label>
+        <div class="bulk-options-grid">
+          ${Array.from({ length: 4 }, (_, optionIndex) => `
+            <label>Option ${optionIndex + 1}
+              <input data-bulk-option="${optionIndex}" value="${escapeHtml(options[optionIndex] || "")}" placeholder="Option ${optionIndex + 1}">
+            </label>
+          `).join("")}
+        </div>
+        <label>Correct Option
+          <select data-bulk-field="correctIndex">
+            ${Array.from({ length: 4 }, (_, optionIndex) => `
+              <option value="${optionIndex}" ${Number(question?.correctIndex || 0) === optionIndex ? "selected" : ""}>Option ${optionIndex + 1}</option>
+            `).join("")}
+          </select>
+        </label>
+      </article>
+    `;
+  }).join("");
+}
+
+function openHostBulkBuilder() {
+  const panel = $("#hostBulkBuilder");
+  if (!panel) return;
+  state.hostBulkDate = state.hostManageDate || new Date().toISOString().slice(0, 10);
+  $("#hostBulkDate").value = state.hostBulkDate;
+  $("#hostBulkTime").value = $("#hostSetTime")?.value || defaultHostBulkTime(state.hostBulkDate);
+  panel.hidden = false;
+  renderHostBulkBuilder();
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function loadHostBulkDate() {
+  const date = $("#hostBulkDate")?.value;
+  if (!date) return toast("Select a host quiz date first.");
+  state.hostBulkDate = date;
+  state.hostManageDate = date;
+  if ($("#hostDateSelect")) $("#hostDateSelect").value = date;
+  if (!$("#hostBulkTime")?.value) $("#hostBulkTime").value = defaultHostBulkTime(date);
+  renderQuestionManagers();
+  renderHostBulkBuilder();
+}
+
+function clearHostBulkDraft() {
+  $$("#hostBulkQuestions .bulk-question-card").forEach(card => {
+    card.dataset.questionId = "";
+    card.querySelector('[data-bulk-field="text"]').value = "";
+    card.querySelectorAll("[data-bulk-option]").forEach(input => {
+      input.value = "";
+    });
+    card.querySelector('[data-bulk-field="correctIndex"]').value = "0";
+  });
+}
+
+async function saveHostBulkQuestions() {
+  const date = $("#hostBulkDate")?.value;
+  const time = $("#hostBulkTime")?.value;
+  if (!date || !time) return toast("Choose date and live time first.");
+  const scheduledAt = new Date(time).toISOString();
+  const cards = $$("#hostBulkQuestions .bulk-question-card");
+  if (cards.length !== 10) return toast("Open the 10-question builder first.");
+  const savedIds = [];
+  try {
+    for (const card of cards) {
+      const slot = card.dataset.bulkSlot;
+      const text = card.querySelector('[data-bulk-field="text"]').value.trim();
+      const options = Array.from(card.querySelectorAll("[data-bulk-option]")).map(input => input.value.trim()).filter(Boolean);
+      const correctIndex = Number(card.querySelector('[data-bulk-field="correctIndex"]').value);
+      if (!text || options.length < 2) throw new Error(`Fill question ${slot} and at least 2 options.`);
+      if (correctIndex >= options.length) throw new Error(`Correct option for question ${slot} must have option text.`);
+      const payload = {
+        adminPin: state.adminPin,
+        type: "host",
+        id: card.dataset.questionId || "",
+        text,
+        options,
+        correctIndex,
+        scheduledAt
+      };
+      const result = await api("/api/admin/question", { method: "POST", body: JSON.stringify(payload) });
+      savedIds.push(result.question.id);
+      card.dataset.questionId = result.question.id;
+    }
+    await api("/api/admin/host-set/schedule", {
+      method: "POST",
+      body: JSON.stringify({ adminPin: state.adminPin, scheduledAt, questionIds: savedIds })
+    });
+    state.hostManageDate = date;
+    if ($("#hostDateSelect")) $("#hostDateSelect").value = date;
+    toast("10 Play with Host questions saved and scheduled.");
+    await refresh();
+    renderHostBulkBuilder();
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
 function renderQuestionManagers() {
   const daily = $("#dailyQuestionManager");
   if (daily) {
@@ -1479,7 +1610,18 @@ function prepareHostQuestionForm() {
   form.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-bind("#addHostQuestionBtn", "click", prepareHostQuestionForm);
+bind("#addHostQuestionBtn", "click", openHostBulkBuilder);
+bind("#closeHostBulkBtn", "click", () => {
+  const panel = $("#hostBulkBuilder");
+  if (panel) panel.hidden = true;
+});
+bind("#loadHostBulkBtn", "click", loadHostBulkDate);
+bind("#saveHostBulkBtn", "click", saveHostBulkQuestions);
+bind("#clearHostBulkBtn", "click", clearHostBulkDraft);
+bind("#hostBulkDate", "change", event => {
+  state.hostBulkDate = event.target.value;
+  if ($("#hostBulkTime")) $("#hostBulkTime").value = defaultHostBulkTime(state.hostBulkDate);
+});
 
 function setDailyManageDate(date) {
   state.dailyManageDate = date.toISOString().slice(0, 10);
@@ -1505,7 +1647,13 @@ function setHostManageDate(date) {
   if ($("#hostDateSelect")) $("#hostDateSelect").value = state.hostManageDate;
   const defaultTime = new Date(`${state.hostManageDate}T20:00:00`);
   if ($("#hostSetTime")) $("#hostSetTime").value = defaultTime.toISOString().slice(0, 16);
+  if ($("#hostBulkDate")) $("#hostBulkDate").value = state.hostManageDate;
+  if ($("#hostBulkTime")) $("#hostBulkTime").value = defaultTime.toISOString().slice(0, 16);
   renderQuestionManagers();
+  if ($("#hostBulkBuilder") && !$("#hostBulkBuilder").hidden) {
+    state.hostBulkDate = state.hostManageDate;
+    renderHostBulkBuilder();
+  }
 }
 
 bind("#hostDateSelect", "change", event => {

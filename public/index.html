@@ -287,10 +287,29 @@ Patna</textarea></label>
               </div>
               <div id="hostSetSummary" class="host-set-summary"></div>
               <div class="host-set-actions">
-                <button id="addHostQuestionBtn" type="button">Add Host Question</button>
+                <button id="addHostQuestionBtn" type="button">Add 10 Questions by Date</button>
                 <label>Set Live Time <input id="hostSetTime" type="datetime-local"></label>
                 <button id="scheduleHostSetBtn" type="button">Schedule 10 Questions</button>
                 <button id="makeHostSetLiveBtn" type="button">Make 10 Live Now</button>
+              </div>
+              <div id="hostBulkBuilder" class="host-bulk-builder" hidden>
+                <div class="bulk-head">
+                  <div>
+                    <h3>Add 10 Host Questions</h3>
+                    <p>Choose the date and live time, then fill all 10 questions for that day.</p>
+                  </div>
+                  <button id="closeHostBulkBtn" class="outline-dark" type="button">Close</button>
+                </div>
+                <div class="host-date-picker">
+                  <label>Quiz Date <input id="hostBulkDate" type="date"></label>
+                  <label>Live Time <input id="hostBulkTime" type="datetime-local"></label>
+                  <button id="loadHostBulkBtn" type="button">Load Date</button>
+                </div>
+                <div id="hostBulkQuestions" class="bulk-question-list"></div>
+                <div class="inline-actions bulk-actions">
+                  <button id="saveHostBulkBtn" type="button">Save 10 Questions</button>
+                  <button id="clearHostBulkBtn" class="outline-dark" type="button">Clear Draft</button>
+                </div>
               </div>
               <div id="hostQuestionManager" class="results"></div>
               <h3>Host Schedule by Date</h3>

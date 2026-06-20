@@ -1273,10 +1273,66 @@ select:focus {
   background: #ffffff;
 }
 
+.host-date-accordion {
+  padding: 0;
+  overflow: hidden;
+}
+
+.host-date-accordion summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  padding: 16px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.host-date-accordion summary::-webkit-details-marker {
+  display: none;
+}
+
+.host-date-accordion summary::before {
+  content: "+";
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  background: #f0e9ff;
+  color: var(--purple);
+  font-weight: 950;
+}
+
+.host-date-accordion[open] summary::before {
+  content: "-";
+  background: var(--gold);
+  color: var(--purple-dark);
+}
+
+.host-date-accordion summary > div:first-child {
+  flex: 1;
+}
+
+.accordion-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.accordion-meta button {
+  min-height: 32px;
+  padding: 0 10px;
+  box-shadow: none;
+}
+
 .host-date-list {
   display: grid;
   gap: 8px;
-  margin-top: 10px;
+  padding: 0 16px 16px 54px;
 }
 
 .host-date-list div {

@@ -1494,24 +1494,32 @@ function renderHostScheduleByDate() {
   }, {});
   wrap.innerHTML = Object.entries(groups)
     .sort(([a], [b]) => new Date(a || 0) - new Date(b || 0))
-    .map(([dateKey, questions]) => {
+    .map(([dateKey, questions], groupIndex) => {
       const live = questions.some(question => question.scheduledAt && new Date(question.scheduledAt) <= new Date());
+      const sorted = questions.slice().sort((a, b) => new Date(a.scheduledAt || 0) - new Date(b.scheduledAt || 0));
+      const firstTime = sorted.find(question => question.scheduledAt)?.scheduledAt;
+      const formattedDate = dateKey === "No date set" ? dateKey : new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date(`${dateKey}T00:00:00`));
       return `
-        <div class="result host-date-group">
-          <strong>${dateKey === "No date set" ? dateKey : new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date(`${dateKey}T00:00:00`))}</strong>
-          <p>${questions.length}/10 questions · ${live ? "Live now" : "Scheduled"}</p>
-          <div class="inline-actions">
-            <button type="button" data-select-host-date="${dateKey}">Open This Date</button>
-          </div>
+        <details class="result host-date-group host-date-accordion" ${groupIndex === 0 ? "open" : ""}>
+          <summary>
+            <div>
+              <strong>${formattedDate}</strong>
+              <p>${questions.length}/10 questions${firstTime ? ` · ${formatDateTime(firstTime)}` : ""}</p>
+            </div>
+            <div class="accordion-meta">
+              <span class="status-chip ${live ? "active" : "scheduled"}">${live ? "Live / Past" : "Scheduled"}</span>
+              <button type="button" data-select-host-date="${dateKey}">Open This Date</button>
+            </div>
+          </summary>
           <div class="host-date-list">
-            ${questions.map((question, index) => `
+            ${sorted.map((question, index) => `
               <div>
-                <span>${index + 1}. ${question.text}</span>
+                <span>${index + 1}. ${question.text} · ${question.scheduledAt ? formatDateTime(question.scheduledAt) : "No time set"}</span>
                 <button type="button" data-edit-question="${question.id}" data-type="host">Edit</button>
               </div>
             `).join("")}
           </div>
-        </div>
+        </details>
       `;
     })
     .join("");
@@ -2039,7 +2047,7 @@ function showAdminView(view = "dashboard") {
   $(".admin-head h1").textContent = {
     dashboard: "Dashboard",
     daily: "Daily Quiz Questions",
-    host: "Host Quiz Questions",
+    host: "Mega Challenge",
     users: "Users",
     winners: "Winners",
     announcements: "Announcements",

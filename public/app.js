@@ -10,6 +10,7 @@ const state = {
   dailyAnswerRows: [],
   hostLeaderboard: [],
   hostAttemptRows: [],
+  announcements: [],
   adminStats: null,
   userSearch: "",
   userDateFilter: "all",
@@ -136,6 +137,7 @@ function createOfflineDb() {
     ],
     dailyAnswers: [],
     hostAttempts: [],
+    announcements: [],
     dailyWinnerSelections: {},
     hostWinnerSelections: {}
   };
@@ -153,6 +155,7 @@ function readOfflineDb() {
       if (parsed.schemaVersion === OFFLINE_SCHEMA_VERSION) {
         parsed.dailyWinnerSelections ||= {};
         parsed.hostWinnerSelections ||= {};
+        parsed.announcements ||= [];
         parsed.users ||= [];
         parsed.users.forEach(user => {
           user.loginCount ||= 0;
@@ -382,6 +385,7 @@ function offlineBootstrap(userId, admin = false) {
       order: index + 1,
       correctOption: question.options?.[question.correctIndex] || ""
     })) : [],
+    announcements: admin ? (db.announcements || []).slice().reverse() : (db.announcements || []).slice(-1),
     dailyWinners: admin ? offlineDailyWinners(db) : offlinePublicDailyWinners(db),
     hostLeaderboard: admin ? offlineHostLeaderboard(db) : publicHostLeaderboard,
     dailyAnswerRows: admin ? offlineDailyAnswerRows(db) : [],
@@ -531,6 +535,26 @@ async function offlineApi(path, options = {}) {
     else target.push(question);
     writeOfflineDb(db);
     return { question };
+  }
+
+  if (url.pathname === "/api/admin/announcement") {
+    if (String(body.adminToken || "") !== "offline-admin-token") throw new Error("Admin login required.");
+    const title = String(body.title || "").trim();
+    const message = String(body.message || "").trim();
+    if (!title || !message) throw new Error("Announcement title and message are required.");
+    const announcement = {
+      id: offlineId("ann"),
+      audience: String(body.audience || "all"),
+      title,
+      message,
+      status: "sent",
+      createdAt: isoNow(),
+      pushStatus: "pending_firebase_setup"
+    };
+    db.announcements ||= [];
+    db.announcements.push(announcement);
+    writeOfflineDb(db);
+    return { announcement };
   }
 
   if (url.pathname === "/api/admin/question/delete") {
@@ -725,6 +749,12 @@ function renderLiveAlert() {
 function renderWinnerNotice() {
   const notice = $("#winnerNotice");
   if (!notice) return;
+  const latestAnnouncement = state.announcements?.[0];
+  if (latestAnnouncement) {
+    notice.textContent = `${latestAnnouncement.title}: ${latestAnnouncement.message}`;
+    notice.classList.add("active");
+    return;
+  }
   const latest = state.dailyWinners
     .filter(item => item.winner)
     .sort((a, b) => new Date(b.winner.answeredAt) - new Date(a.winner.answeredAt))[0];
@@ -735,6 +765,25 @@ function renderWinnerNotice() {
   }
   notice.textContent = `${latest.winner.name} is currently the fastest correct answer for ₹${latest.prize || 500}. Final winner is confirmed after review.`;
   notice.classList.add("active");
+}
+
+function renderAnnouncements() {
+  const log = $("#announcementLog");
+  if (!log) return;
+  log.innerHTML = state.announcements?.length
+    ? state.announcements.map(item => `
+      <div class="result announcement-row">
+        <div>
+          <div class="question-row-head">
+            <strong>${escapeHtml(item.title)}</strong>
+            <span class="status-chip active">${item.status || "Sent"}</span>
+          </div>
+          <p>${escapeHtml(item.message)}</p>
+          <p>Audience: ${escapeHtml(item.audience || "all")} · ${item.createdAt ? formatDateTime(item.createdAt) : "-"}</p>
+        </div>
+      </div>
+    `).join("")
+    : `<div class="result">No announcements yet.</div>`;
 }
 
 function renderDailyQuestions() {
@@ -956,7 +1005,7 @@ function questionManagerHtml(question, type) {
   const timing = live ? "Live now" : question.scheduledAt ? `Live at ${formatDateTime(question.scheduledAt)}` : "No live time set";
   return `
     <div class="result managed-question">
-      <strong>${question.order}. ${question.text}</strong>
+      <div class="question-row-head"><strong>${question.order}. ${question.text}</strong>${statusChip(question)}</div>
       <p>${type === "daily" ? `Prize ₹${question.prize || 500} · ` : ""}${timing}</p>
       <p>Correct: ${question.correctOption || question.options?.[question.correctIndex] || "-"}</p>
       <div class="inline-actions">
@@ -976,6 +1025,22 @@ function dateKey(value) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function questionStatus(question) {
+  if (!question?.scheduledAt) return { key: "draft", label: "Draft" };
+  const nowTime = Date.now();
+  const scheduled = new Date(question.scheduledAt).getTime();
+  const day = dateKey(question.scheduledAt);
+  const today = dateKey(new Date());
+  if (scheduled > nowTime) return { key: "scheduled", label: "Scheduled" };
+  if (day === today) return { key: "active", label: "Active" };
+  return { key: "expired", label: "Expired" };
+}
+
+function statusChip(question) {
+  const status = questionStatus(question);
+  return `<span class="status-chip ${status.key}">${status.label}</span>`;
 }
 
 function renderAdminUsers() {
@@ -1063,7 +1128,7 @@ function dailySlotHtml(slot, question) {
   }
   return `
     <div class="result managed-question">
-      <strong>Daily Slot ${slot}: ${question.text}</strong>
+      <div class="question-row-head"><strong>Daily Slot ${slot}: ${question.text}</strong>${statusChip(question)}</div>
       <p>Prize ₹${question.prize || 500} · ${question.scheduledAt ? formatDateTime(question.scheduledAt) : "No live time set"}</p>
       <p>Correct: ${question.correctOption || question.options?.[question.correctIndex] || "-"}</p>
       <div class="inline-actions">
@@ -1088,7 +1153,7 @@ function hostSlotHtml(slot, question) {
   }
   return `
     <div class="result managed-question host-slot">
-      <strong>Slot ${slot}: ${question.text}</strong>
+      <div class="question-row-head"><strong>Slot ${slot}: ${question.text}</strong>${statusChip(question)}</div>
       <p>${((!question.scheduledAt && question.status === "live") || (question.scheduledAt && new Date(question.scheduledAt) <= new Date())) ? "Live now" : question.scheduledAt ? `Live at ${formatDateTime(question.scheduledAt)}` : "No live time set"}</p>
       <p>Correct: ${question.correctOption || question.options?.[question.correctIndex] || "-"}</p>
       <div class="inline-actions">
@@ -1350,6 +1415,7 @@ async function refresh() {
   state.dailyAnswerRows = data.dailyAnswerRows || [];
   state.hostLeaderboard = data.hostLeaderboard;
   state.hostAttemptRows = data.hostAttemptRows || [];
+  state.announcements = data.announcements || [];
   state.adminStats = data.adminStats || null;
   state.hostAlreadyQualified = data.hostAlreadyQualified;
   state.lastLiveSignature = [
@@ -1359,6 +1425,7 @@ async function refresh() {
   renderDailyQuestions();
   renderHostQuestions();
   renderResults();
+  renderAnnouncements();
   setActiveUser(state.activeUser);
 }
 
@@ -1492,6 +1559,25 @@ bind("#questionForm", "submit", async event => {
   }
 });
 
+bind("#announcementForm", "submit", async event => {
+  event.preventDefault();
+  const formEl = event.currentTarget;
+  const submit = formEl.querySelector("button[type='submit']");
+  const payload = Object.fromEntries(new FormData(formEl).entries());
+  payload.adminToken = state.adminToken;
+  submit.disabled = true;
+  try {
+    await api("/api/admin/announcement", { method: "POST", body: JSON.stringify(payload) });
+    toast("Announcement saved. Push delivery will be enabled after Firebase setup.");
+    formEl.reset();
+    await refresh();
+  } catch (error) {
+    toast(error.message);
+  } finally {
+    submit.disabled = false;
+  }
+});
+
 function clearQuestionForm() {
   const form = $("#questionForm");
   if (!form) return;
@@ -1502,6 +1588,22 @@ function clearQuestionForm() {
 }
 
 bind("#clearQuestionFormBtn", "click", clearQuestionForm);
+
+function openQuestionEditor(title, subtitle) {
+  const panel = $("#questionEditorPanel");
+  if (!panel) return;
+  $("#questionEditorTitle").textContent = title || "Add Question";
+  $("#questionEditorSubtitle").textContent = subtitle || "Choose quiz type, write the question, and schedule when it becomes live.";
+  panel.hidden = false;
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function closeQuestionEditor() {
+  const panel = $("#questionEditorPanel");
+  if (panel) panel.hidden = true;
+}
+
+bind("#closeQuestionEditorBtn", "click", closeQuestionEditor);
 
 document.addEventListener("click", async event => {
   const selectDailyDate = event.target.closest("[data-select-daily-date]");
@@ -1571,6 +1673,7 @@ document.addEventListener("click", async event => {
   try {
     if (edit) {
       const form = $("#questionForm");
+      openQuestionEditor(`Edit ${type === "host" ? "Host" : "Daily"} Question`, "Update the question, answer options, correct answer, and live schedule.");
       form.elements.id.value = question.id;
       form.elements.type.value = type;
       form.elements.scheduledAt.value = question.scheduledAt ? new Date(question.scheduledAt).toISOString().slice(0, 16) : "";
@@ -1581,7 +1684,6 @@ document.addEventListener("click", async event => {
       form.elements.prize.value = question.prize || 500;
       updateQuestionFormMode();
       showAdminView(type);
-      form.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
     if (remove) {
@@ -1612,8 +1714,8 @@ function prepareDailyQuestionForm(slot = 1) {
   form.elements.prize.value = 500;
   form.elements.liveNow.checked = false;
   updateQuestionFormMode();
+  openQuestionEditor(`Add Daily Question ${slot}/2`, `Schedule this question for ${state.dailyManageDate}. Each daily question can have a separate live time.`);
   showAdminView("daily");
-  form.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function prepareHostQuestionForm() {
@@ -1630,11 +1732,26 @@ function prepareHostQuestionForm() {
   form.elements.prize.value = 500;
   form.elements.liveNow.checked = false;
   updateQuestionFormMode();
+  openQuestionEditor("Add Play with Host Question", `Add a question to the 10-question set for ${state.hostManageDate}.`);
   showAdminView("host");
-  form.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 bind("#addHostQuestionBtn", "click", openHostBulkBuilder);
+bind("#addDailyQuestionBtn", "click", () => prepareDailyQuestionForm(selectedDailyQuestions().length + 1));
+bind("#addSingleHostQuestionBtn", "click", prepareHostQuestionForm);
+bind("#quickAddDailyBtn", "click", () => {
+  showAdminView("daily");
+  prepareDailyQuestionForm(selectedDailyQuestions().length + 1);
+});
+bind("#quickAddHostBtn", "click", () => {
+  showAdminView("host");
+  prepareHostQuestionForm();
+});
+bind("#quickAddHostSetBtn", "click", () => {
+  showAdminView("host");
+  openHostBulkBuilder();
+});
+bind("#quickAnnouncementBtn", "click", () => showAdminView("announcements"));
 bind("#closeHostBulkBtn", "click", () => {
   const panel = $("#hostBulkBuilder");
   if (panel) panel.hidden = true;
@@ -1802,8 +1919,21 @@ function showAdminView(view = "dashboard") {
     host: "Host Quiz Questions",
     users: "Users",
     winners: "Winners",
+    announcements: "Announcements",
     payouts: "Payouts"
   }[view] || "Dashboard";
+  const subtitle = $("#adminViewSubtitle");
+  if (subtitle) {
+    subtitle.textContent = {
+      dashboard: "Control quiz schedules, users, winners, and communication from one place.",
+      daily: "Add, schedule, edit, and review two Daily Quiz questions by date and time.",
+      host: "Prepare 10-question Play with Host sets by date and shortlist the fastest all-correct users.",
+      users: "Search registered users, contact numbers, login history, and account details.",
+      winners: "Review answer timing, select winners, and mark users as notified.",
+      announcements: "Create user-facing messages now and connect them to push delivery after Firebase setup.",
+      payouts: "Track selected winners and expected payout totals."
+    }[view] || "Control quiz schedules, users, winners, and communication from one place.";
+  }
 }
 
 $$("[data-admin-view]").forEach(button => {

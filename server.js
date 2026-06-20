@@ -164,7 +164,8 @@ const seed = {
     hostQuestion(10, "What is the Gyan Chakra tagline?", ["Gyan Aapka Inam Hamara", "Sabka Phone Sabka Data", "Quiz Bandh Hai", "Only Luck Works"], 0)
   ],
   dailyAnswers: [],
-  hostAttempts: []
+  hostAttempts: [],
+  announcements: []
 };
 
 function ensureDb() {
@@ -183,6 +184,7 @@ function readDb() {
   db.hostQuestions ||= [];
   db.dailyAnswers ||= [];
   db.hostAttempts ||= [];
+  db.announcements ||= [];
   if (!db.dailyWinnerSelections) {
     db.dailyWinnerSelections = {};
     changed = true;
@@ -377,7 +379,8 @@ function adminStats(db) {
     dailyLive,
     hostLive,
     dailyAnswersToday: db.dailyAnswers.filter(answer => answer.answeredAt && localDayKey(answer.answeredAt) === today).length,
-    hostAttemptsToday: db.hostAttempts.filter(attempt => attempt.submittedAt && localDayKey(attempt.submittedAt) === today).length
+    hostAttemptsToday: db.hostAttempts.filter(attempt => attempt.submittedAt && localDayKey(attempt.submittedAt) === today).length,
+    announcementsSent: db.announcements.length
   };
 }
 
@@ -387,6 +390,17 @@ function adminQuestion(q, index) {
     correctIndex: q.correctIndex,
     order: index + 1,
     correctOption: q.options?.[q.correctIndex] || ""
+  };
+}
+
+function publicAnnouncement(item) {
+  return {
+    id: item.id,
+    audience: item.audience,
+    title: item.title,
+    message: item.message,
+    createdAt: item.createdAt,
+    status: item.status || "sent"
   };
 }
 
@@ -573,6 +587,7 @@ async function handleApi(req, res) {
       hostQuestions: liveHostQuestions(db).map(publicQuestion),
       allDailyQuestions: admin ? db.dailyQuestions.map(adminQuestion) : [],
       allHostQuestions: admin ? db.hostQuestions.map(adminQuestion) : [],
+      announcements: admin ? db.announcements.map(publicAnnouncement).reverse() : db.announcements.slice(-1).map(publicAnnouncement),
       dailyWinners: admin ? dailyWinners(db) : publicDailyWinners(db),
       hostLeaderboard: admin ? hostLeaderboard(db) : hostLeaderboard(db).map(item => ({
         id: item.id,
@@ -758,6 +773,26 @@ async function handleApi(req, res) {
     else target.push(question);
     writeDb(db);
     return send(res, 201, { question });
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/admin/announcement") {
+    const body = await parseBody(req);
+    if (!isAdminRequest(req, body, db)) return send(res, 403, { error: "Admin login required." });
+    const title = String(body.title || "").trim();
+    const message = String(body.message || "").trim();
+    if (!title || !message) return send(res, 400, { error: "Announcement title and message are required." });
+    const announcement = {
+      id: id("ann"),
+      audience: String(body.audience || "all"),
+      title,
+      message,
+      status: "sent",
+      createdAt: now(),
+      pushStatus: "pending_firebase_setup"
+    };
+    db.announcements.push(announcement);
+    writeDb(db);
+    return send(res, 201, { announcement: publicAnnouncement(announcement) });
   }
 
   if (req.method === "POST" && url.pathname === "/api/admin/question/delete") {

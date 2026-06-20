@@ -214,12 +214,19 @@
 
       <section id="adminScreen" class="screen admin-screen">
         <aside class="admin-sidebar">
-          <h2>Gyan Chakra Admin Panel</h2>
-          <button data-admin-view="dashboard">Dashboard</button>
-          <button data-admin-view="daily">Daily Quiz Questions</button>
-          <button data-admin-view="host">Host Quiz Questions</button>
-          <button data-admin-view="users">Users</button>
-          <button data-admin-view="winners">Winners</button>
+          <div class="admin-brand">
+            <span>GC</span>
+            <div>
+              <h2>Gyan Chakra</h2>
+              <p>Operations Console</p>
+            </div>
+          </div>
+          <button data-admin-view="dashboard">Overview</button>
+          <button data-admin-view="daily">Daily Quiz</button>
+          <button data-admin-view="host">Play with Host</button>
+          <button data-admin-view="users">User Management</button>
+          <button data-admin-view="winners">Winner Review</button>
+          <button data-admin-view="announcements">Announcements</button>
           <button data-admin-view="payouts">Payouts</button>
           <button id="resetDemoBtn">Reset Demo</button>
         </aside>
@@ -228,18 +235,31 @@
             <div>
               <p class="section-label">Agent Workspace</p>
               <h1>Dashboard</h1>
+              <p id="adminViewSubtitle">Control quiz schedules, users, winners, and communication from one place.</p>
             </div>
             <button class="outline-dark" id="adminLogoutBtn">Logout</button>
           </div>
-          <div class="admin-metrics" data-admin-section="dashboard payouts">
+          <div class="admin-metrics" data-admin-section="dashboard payouts users winners announcements">
             <div><span>Total Users</span><strong id="adminUsers">0</strong></div>
             <div><span>Daily Winners</span><strong id="adminDailyWinners">0</strong></div>
             <div><span>Host Qualified</span><strong id="adminHostQualified">0</strong></div>
             <div><span>Total Payout</span><strong id="adminPayout">₹0</strong></div>
           </div>
+          <div class="admin-command-strip" data-admin-section="dashboard">
+            <button id="quickAddDailyBtn" type="button">Add Daily Question</button>
+            <button id="quickAddHostBtn" type="button">Add Host Question</button>
+            <button id="quickAddHostSetBtn" type="button">Add 10 Host Questions</button>
+            <button id="quickAnnouncementBtn" type="button">Send Announcement</button>
+          </div>
           <div class="admin-grid">
-            <div class="admin-panel" data-admin-section="dashboard daily host">
-              <h3>Upload / Manage Questions</h3>
+            <div class="admin-panel question-editor-panel" id="questionEditorPanel" data-admin-section="daily host" hidden>
+              <div class="panel-title-row">
+                <div>
+                  <h3 id="questionEditorTitle">Add Question</h3>
+                  <p id="questionEditorSubtitle">Choose quiz type, write the question, and schedule when it becomes live.</p>
+                </div>
+                <button class="outline-dark" id="closeQuestionEditorBtn" type="button">Close</button>
+              </div>
               <form id="questionForm" class="form">
                 <input name="id" type="hidden">
                 <label>Quiz Type
@@ -259,13 +279,18 @@ Dhanbad
 Patna</textarea></label>
                 <label>Correct Option Number <input name="correctIndex" type="number" min="1" value="1" required></label>
                 <label class="daily-prize-field">Prize for Daily Quiz <input name="prize" type="number" value="500"></label>
-                <button type="submit">Publish Question</button>
+                <button type="submit">Save Question</button>
                 <button class="outline-dark" id="clearQuestionFormBtn" type="button">Clear Form</button>
               </form>
             </div>
             <div class="admin-panel wide" data-admin-section="daily">
-              <h3>Daily Quiz Questions</h3>
-              <p>Select a date, schedule two Daily Quiz questions at separate times, and review winners by date.</p>
+              <div class="panel-title-row">
+                <div>
+                  <h3>Daily Quiz Control</h3>
+                  <p>Schedule two questions per day. Each question can have a separate live time and ₹500 winner review.</p>
+                </div>
+                <button id="addDailyQuestionBtn" type="button">Add Question</button>
+              </div>
               <div class="host-date-picker">
                 <label>Post by Date <input id="dailyDateSelect" type="date"></label>
                 <button id="todayDailyDateBtn" type="button">Today</button>
@@ -277,8 +302,13 @@ Patna</textarea></label>
               <div id="dailyScheduleByDate" class="results"></div>
             </div>
             <div class="admin-panel wide" data-admin-section="host">
-              <h3>Play with Host Questions</h3>
-              <p>Select a date, add 10 host questions for that date, then schedule or make that date's set live.</p>
+              <div class="panel-title-row">
+                <div>
+                  <h3>Play with Host Control</h3>
+                  <p>Build 10-question sets by date. Players submit all answers, and you shortlist fastest all-correct users.</p>
+                </div>
+                <button id="addSingleHostQuestionBtn" type="button">Add Question</button>
+              </div>
               <div class="host-date-picker">
                 <label>Post by Date <input id="hostDateSelect" type="date"></label>
                 <button id="todayHostDateBtn" type="button">Today</button>
@@ -330,6 +360,28 @@ Patna</textarea></label>
             <div class="admin-panel wide" data-admin-section="dashboard winners">
               <h3>Host Attempts</h3>
               <div id="hostAttemptLog" class="results"></div>
+            </div>
+            <div class="admin-panel wide" data-admin-section="dashboard announcements">
+              <div class="panel-title-row">
+                <div>
+                  <h3>Announcements</h3>
+                  <p>Send app-wide messages now. This is ready for Firebase push once notification credentials are added.</p>
+                </div>
+              </div>
+              <form id="announcementForm" class="form compact-form">
+                <label>Audience
+                  <select name="audience">
+                    <option value="all">All users</option>
+                    <option value="daily">Daily Quiz players</option>
+                    <option value="host">Play with Host players</option>
+                    <option value="winners">Winners / shortlisted users</option>
+                  </select>
+                </label>
+                <label>Title <input name="title" placeholder="Example: Today’s winner announced" required></label>
+                <label>Message <textarea name="message" placeholder="Write the notification message users should see" required></textarea></label>
+                <button type="submit">Save Announcement</button>
+              </form>
+              <div id="announcementLog" class="results"></div>
             </div>
             <div class="admin-panel wide" data-admin-section="dashboard users">
               <h3>Registered Users</h3>

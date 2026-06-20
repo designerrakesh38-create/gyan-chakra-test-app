@@ -13,6 +13,7 @@ const state = {
   announcements: [],
   adminStats: null,
   userSearch: "",
+  dailyContestSearch: "",
   userDateFilter: "all",
   hostAlreadyQualified: false,
   hostAnswers: new Map(),
@@ -786,6 +787,60 @@ function renderAnnouncements() {
     : `<div class="result">No announcements yet.</div>`;
 }
 
+function dailyAnswerRowHtml(answer) {
+  return `
+    <div class="result answer-row ${answer.correct ? "correct" : "wrong"}">
+      <div class="question-row-head">
+        <strong>${escapeHtml(answer.name)} · ${(answer.timeMs / 1000).toFixed(2)}s</strong>
+        <span class="status-chip ${answer.correct ? "active" : "expired"}">${answer.correct ? "Correct" : "Wrong"}</span>
+      </div>
+      <p>${escapeHtml(answer.question)}</p>
+      <p>Selected: ${escapeHtml(answer.selectedOption)} · Correct: ${escapeHtml(answer.correctOption)}</p>
+      <div class="inline-actions">
+        ${answer.phone ? `<a class="call-link" href="tel:${answer.phone}">Call User</a>` : ""}
+        ${answer.correct ? `<button type="button" data-select-winner="${answer.id}" data-type="daily">${answer.selectedWinner ? "Selected" : "Select Winner"}</button>` : ""}
+        <button type="button" data-notify-record="${answer.id}" data-type="daily">${answer.notifiedAt ? "Notified" : "Mark Notified"}</button>
+      </div>
+    </div>
+  `;
+}
+
+function dailyWinnerHtml(item) {
+  return item.winner ? `
+    <div class="result winner-review-card">
+      <div class="question-row-head">
+        <strong>${escapeHtml(item.winner.name)} · ${(item.winner.timeMs / 1000).toFixed(2)}s</strong>
+        <span class="status-chip ${item.winnerStatus === "selected" ? "active" : "scheduled"}">${item.winnerStatus === "selected" ? "Selected" : "Suggested"}</span>
+      </div>
+      <p>${escapeHtml(item.question)}</p>
+      <p>${item.totalCorrect || 0} correct answer(s) · Prize ₹${item.prize || 500}</p>
+      <div class="inline-actions">
+        ${item.winner.phone ? `<a class="call-link" href="tel:${item.winner.phone}">Call User</a>` : ""}
+        <button type="button" data-select-winner="${item.winner.answerId}" data-type="daily">${item.winnerStatus === "selected" ? "Selected" : "Confirm Winner"}</button>
+        <button type="button" data-notify-record="${item.winner.answerId}" data-type="daily">${item.winner.notifiedAt ? "Notified" : "Mark Notified"}</button>
+      </div>
+    </div>
+  ` : `<div class="result">No correct answers yet for ${escapeHtml(item.question)}.</div>`;
+}
+
+function hostAttemptHtml(attempt) {
+  return `
+    <div class="result answer-row ${attempt.shortlisted ? "correct" : "wrong"}">
+      <div class="question-row-head">
+        <strong>#${attempt.rank}. ${escapeHtml(attempt.name)} · ${(attempt.totalTimeMs / 1000).toFixed(2)}s</strong>
+        <span class="status-chip ${attempt.shortlisted ? "active" : "expired"}">${attempt.correctCount}/${attempt.totalQuestions}</span>
+      </div>
+      <p>${attempt.shortlisted ? "All correct. Review for fastest host selection." : "Not all answers correct."}${attempt.phone ? ` · ${escapeHtml(attempt.phone)}` : ""}</p>
+      <p>${escapeHtml(`${attempt.address || ""} ${attempt.pincode || ""}`.trim())}</p>
+      <div class="inline-actions">
+        ${attempt.phone ? `<a class="call-link" href="tel:${attempt.phone}">Call User</a>` : ""}
+        ${attempt.shortlisted ? `<button type="button" data-select-winner="${attempt.id}" data-type="host">${attempt.selectedWinner ? "Selected" : "Select Host Candidate"}</button>` : ""}
+        <button type="button" data-notify-record="${attempt.id}" data-type="host">${attempt.notifiedAt ? "Notified" : "Mark Notified"}</button>
+      </div>
+    </div>
+  `;
+}
+
 function renderDailyQuestions() {
   const wrap = $("#dailyQuestions");
   wrap.innerHTML = "";
@@ -906,21 +961,9 @@ function renderHostQuestions() {
 }
 
 function renderResults() {
-  $("#dailyWinners").innerHTML = state.dailyWinners.map(item => `
-    <div class="result">
-      <strong>${item.question}</strong>
-      ${item.winner ? `${item.winnerStatus === "selected" ? "Winner selected" : "Fastest suggestion"}: ${item.winner.name} in ${(item.winner.timeMs / 1000).toFixed(2)}s` : "No correct answer yet"}
-      <p>${item.totalCorrect} correct answer(s)${item.winner?.phone ? ` · Call: ${item.winner.phone}` : ""}</p>
-      ${item.winner ? `
-        <p>${item.winner.address || ""} ${item.winner.pincode || ""}</p>
-        <div class="inline-actions">
-          <a class="call-link" href="tel:${item.winner.phone}">Call Winner</a>
-          <button type="button" data-select-winner="${item.winner.answerId}" data-type="daily">${item.winnerStatus === "selected" ? "Selected" : "Select Winner"}</button>
-          <button type="button" data-notify-record="${item.winner.answerId}" data-type="daily">${item.winner.notifiedAt ? "Notified" : "Mark Notified"}</button>
-        </div>
-      ` : ""}
-    </div>
-  `).join("");
+  $("#dailyWinners").innerHTML = state.dailyWinners.length
+    ? state.dailyWinners.map(dailyWinnerHtml).join("")
+    : `<div class="result">No daily winners suggested yet.</div>`;
 
   $("#hostLeaderboard").innerHTML = state.hostLeaderboard.length
     ? state.hostLeaderboard.slice(0, 8).map((item, index) => `
@@ -935,34 +978,44 @@ function renderResults() {
   const dailyLog = $("#dailyAnswerLog");
   if (dailyLog) {
     dailyLog.innerHTML = state.dailyAnswerRows.length
-      ? state.dailyAnswerRows.map(answer => `
-        <div class="result answer-row ${answer.correct ? "correct" : "wrong"}">
-          <strong>${answer.name} · ${(answer.timeMs / 1000).toFixed(2)}s · ${answer.correct ? "Correct" : "Incorrect"}</strong>
-          ${answer.question}
-          <p>Selected: ${answer.selectedOption || "-"} · Correct: ${answer.correctOption || "-"} · ${formatDateTime(answer.answeredAt)}</p>
-          ${answer.correct ? `<div class="inline-actions"><button type="button" data-select-winner="${answer.id}" data-type="daily">${answer.selectedWinner ? "Selected" : "Select Winner"}</button></div>` : ""}
-        </div>
-      `).join("")
+      ? state.dailyAnswerRows.map(dailyAnswerRowHtml).join("")
       : `<div class="result">No daily answers yet.</div>`;
   }
 
   const hostLog = $("#hostAttemptLog");
   if (hostLog) {
     hostLog.innerHTML = state.hostAttemptRows.length
-      ? state.hostAttemptRows.map(attempt => `
-        <div class="result answer-row ${attempt.shortlisted ? "correct" : "wrong"}">
-          <strong>#${attempt.rank}. ${attempt.name} · ${(attempt.totalTimeMs / 1000).toFixed(2)}s</strong>
-          ${attempt.correctCount}/${attempt.totalQuestions} correct
-          <p>${attempt.shortlisted ? "All correct. Review for fastest selection." : "Not all answers correct."}${attempt.phone ? ` · Call: ${attempt.phone}` : ""}</p>
-          <p>${attempt.address || ""} ${attempt.pincode || ""}</p>
-          <div class="inline-actions">
-            <a class="call-link" href="tel:${attempt.phone}">Call User</a>
-            ${attempt.shortlisted ? `<button type="button" data-select-winner="${attempt.id}" data-type="host">${attempt.selectedWinner ? "Selected" : "Select Host Candidate"}</button>` : ""}
-            <button type="button" data-notify-record="${attempt.id}" data-type="host">${attempt.notifiedAt ? "Notified" : "Mark Notified"}</button>
-          </div>
-        </div>
-      `).join("")
+      ? state.hostAttemptRows.map(hostAttemptHtml).join("")
       : `<div class="result">No host attempts yet.</div>`;
+  }
+
+  const dailyParticipation = $("#dailyParticipationPanel");
+  if (dailyParticipation) {
+    dailyParticipation.innerHTML = state.dailyAnswerRows.length
+      ? state.dailyAnswerRows.slice(0, 12).map(dailyAnswerRowHtml).join("")
+      : `<div class="result">No Daily Quiz answers yet.</div>`;
+  }
+
+  const dailyWinnerReview = $("#dailyWinnerReviewPanel");
+  if (dailyWinnerReview) {
+    dailyWinnerReview.innerHTML = state.dailyWinners.length
+      ? state.dailyWinners.map(dailyWinnerHtml).join("")
+      : `<div class="result">No winner suggestions yet.</div>`;
+  }
+
+  const hostAttemptPanel = $("#hostAttemptPanel");
+  if (hostAttemptPanel) {
+    hostAttemptPanel.innerHTML = state.hostAttemptRows.length
+      ? state.hostAttemptRows.slice(0, 12).map(hostAttemptHtml).join("")
+      : `<div class="result">No Play with Host attempts yet.</div>`;
+  }
+
+  const hostShortlistPanel = $("#hostShortlistPanel");
+  if (hostShortlistPanel) {
+    const shortlisted = state.hostAttemptRows.filter(attempt => attempt.shortlisted);
+    hostShortlistPanel.innerHTML = shortlisted.length
+      ? shortlisted.map(hostAttemptHtml).join("")
+      : `<div class="result">No all-correct host attempts yet.</div>`;
   }
 
   renderQuestionManagers();
@@ -1139,6 +1192,63 @@ function dailySlotHtml(slot, question) {
   `;
 }
 
+function dailyContestTableHtml(selected) {
+  const search = state.dailyContestSearch.trim().toLowerCase();
+  const rows = selected.filter(question => !search || question.text.toLowerCase().includes(search));
+  const missingSlots = Array.from({ length: Math.max(0, 2 - selected.length) }, (_, index) => selected.length + index + 1);
+  if (!rows.length && !missingSlots.length) {
+    return `<div class="result">No daily contests match this search.</div>`;
+  }
+  return `
+    <div class="admin-table-wrap">
+      <table class="admin-data-table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Reward</th>
+            <th>Start Date</th>
+            <th>End Date</th>
+            <th>Status</th>
+            <th>Participants</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(question => {
+            const participants = state.dailyAnswerRows.filter(answer => answer.questionId === question.id).length;
+            const endDate = question.scheduledAt ? new Date(new Date(question.scheduledAt).getTime() + 24 * 60 * 60 * 1000).toISOString() : "";
+            const winner = state.dailyWinners.find(item => item.questionId === question.id)?.winner;
+            return `
+              <tr>
+                <td><strong>${escapeHtml(question.text)}</strong></td>
+                <td>₹${question.prize || 500}</td>
+                <td>${question.scheduledAt ? formatDateTime(question.scheduledAt) : "-"}</td>
+                <td>${endDate ? formatDateTime(endDate) : "-"}</td>
+                <td>${statusChip(question)}</td>
+                <td>${participants}</td>
+                <td>
+                  <div class="table-actions">
+                    <button type="button" data-select-daily-date="${questionDateKey(question)}">View</button>
+                    <button type="button" data-edit-question="${question.id}" data-type="daily">Edit</button>
+                    ${winner ? `<button type="button" data-select-winner="${winner.answerId}" data-type="daily">Draw Winner</button>` : ""}
+                    <button type="button" data-delete-question="${question.id}" data-type="daily">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join("")}
+          ${missingSlots.map(slot => `
+            <tr class="empty-table-row">
+              <td colspan="6">Empty daily slot ${slot}/2 for ${state.dailyManageDate}</td>
+              <td><button type="button" data-add-daily-slot="${slot}">Create Daily Quiz</button></td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 function hostSlotHtml(slot, question) {
   if (!question) {
     return `
@@ -1296,23 +1406,31 @@ function renderQuestionManagers() {
   if (daily) {
     const selected = selectedDailyQuestions();
     const liveCount = selected.filter(question => question.scheduledAt && new Date(question.scheduledAt) <= new Date()).length;
+    const scheduledCount = selected.filter(question => questionStatus(question).key === "scheduled").length;
+    const expiredCount = selected.filter(question => questionStatus(question).key === "expired").length;
     const summary = $("#dailySetSummary");
     if (summary) summary.innerHTML = `
       <div><strong>${selected.length}/2</strong><span>Questions on ${state.dailyManageDate}</span></div>
       <div><strong>${liveCount}/2</strong><span>Live now</span></div>
+      <div><strong>${scheduledCount}</strong><span>Scheduled</span></div>
+      <div><strong>${expiredCount}</strong><span>Expired</span></div>
       <div><strong>${selected.length === 2 ? "Ready" : "Incomplete"}</strong><span>Daily set status</span></div>
     `;
-    daily.innerHTML = Array.from({ length: 2 }, (_, index) => dailySlotHtml(index + 1, selected[index])).join("");
+    daily.innerHTML = dailyContestTableHtml(selected);
     renderDailyScheduleByDate();
   }
   const host = $("#hostQuestionManager");
   if (host) {
     const selected = selectedHostQuestions();
     const liveCount = selected.filter(question => (!question.scheduledAt && question.status === "live") || (question.scheduledAt && new Date(question.scheduledAt) <= new Date())).length;
+    const scheduledCount = selected.filter(question => questionStatus(question).key === "scheduled").length;
+    const expiredCount = selected.filter(question => questionStatus(question).key === "expired").length;
     const summary = $("#hostSetSummary");
     if (summary) summary.innerHTML = `
       <div><strong>${selected.length}/10</strong><span>Questions on ${state.hostManageDate}</span></div>
       <div><strong>${Math.min(liveCount, 10)}/10</strong><span>Live now</span></div>
+      <div><strong>${scheduledCount}</strong><span>Scheduled</span></div>
+      <div><strong>${expiredCount}</strong><span>Expired</span></div>
       <div><strong>${selected.length === 10 ? "Ready" : "Incomplete"}</strong><span>Selected date status</span></div>
     `;
     host.innerHTML = Array.from({ length: 10 }, (_, index) => hostSlotHtml(index + 1, selected[index])).join("");
@@ -1714,7 +1832,7 @@ function prepareDailyQuestionForm(slot = 1) {
   form.elements.prize.value = 500;
   form.elements.liveNow.checked = false;
   updateQuestionFormMode();
-  openQuestionEditor(`Add Daily Question ${slot}/2`, `Schedule this question for ${state.dailyManageDate}. Each daily question can have a separate live time.`);
+  openQuestionEditor("Compose Daily Quiz", `Create daily quiz slot ${slot}/2 for ${state.dailyManageDate}. Set reward, question, options, correct answer, and live time.`);
   showAdminView("daily");
 }
 
@@ -1895,6 +2013,11 @@ bind("#resetDemoBtn", "click", async () => {
 bind("#userSearchInput", "input", event => {
   state.userSearch = event.target.value;
   renderAdminUsers();
+});
+
+bind("#dailyContestSearch", "input", event => {
+  state.dailyContestSearch = event.target.value;
+  renderQuestionManagers();
 });
 
 bind("#userDateFilter", "change", event => {

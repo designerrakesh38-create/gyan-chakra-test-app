@@ -286,18 +286,36 @@ Patna</textarea></label>
             <div class="admin-panel wide" data-admin-section="daily">
               <div class="panel-title-row">
                 <div>
-                  <h3>Daily Quiz Control</h3>
-                  <p>Schedule two questions per day. Each question can have a separate live time and ₹500 winner review.</p>
+                  <h3>Daily Contests</h3>
+                  <p>Manage daily quiz parameters, schedule windows, participants, and prize review.</p>
                 </div>
-                <button id="addDailyQuestionBtn" type="button">Add Question</button>
+                <button id="addDailyQuestionBtn" type="button">Create Daily Quiz</button>
               </div>
               <div class="host-date-picker">
                 <label>Post by Date <input id="dailyDateSelect" type="date"></label>
                 <button id="todayDailyDateBtn" type="button">Today</button>
                 <button id="tomorrowDailyDateBtn" type="button">Tomorrow</button>
               </div>
+              <div class="admin-table-toolbar">
+                <input id="dailyContestSearch" placeholder="Search daily contests by title...">
+                <button class="outline-dark" type="button">Columns</button>
+                <button class="outline-dark" type="button">CSV</button>
+                <button class="outline-dark" type="button">Excel</button>
+              </div>
               <div class="host-set-summary" id="dailySetSummary"></div>
               <div id="dailyQuestionManager" class="results"></div>
+              <div class="module-split">
+                <div>
+                  <h3>Participation</h3>
+                  <p>See every answer submitted for Daily Quiz and compare timing before selecting a winner.</p>
+                  <div id="dailyParticipationPanel" class="results"></div>
+                </div>
+                <div>
+                  <h3>Winner Suggestions</h3>
+                  <p>Fastest correct users appear here. You can select and mark them as notified.</p>
+                  <div id="dailyWinnerReviewPanel" class="results"></div>
+                </div>
+              </div>
               <h3>Daily Schedule by Date</h3>
               <div id="dailyScheduleByDate" class="results"></div>
             </div>
@@ -341,6 +359,18 @@ Patna</textarea></label>
                 </div>
               </div>
               <div id="hostQuestionManager" class="results"></div>
+              <div class="module-split">
+                <div>
+                  <h3>Host Attempts</h3>
+                  <p>Every submitted 10-question attempt appears here with correct count and total time.</p>
+                  <div id="hostAttemptPanel" class="results"></div>
+                </div>
+                <div>
+                  <h3>Host Shortlist</h3>
+                  <p>All-correct users are shortlisted for review and contact.</p>
+                  <div id="hostShortlistPanel" class="results"></div>
+                </div>
+              </div>
               <h3>Host Schedule by Date</h3>
               <p>Review which host questions are scheduled on each date and edit them anytime.</p>
               <div id="hostScheduleByDate" class="results"></div>

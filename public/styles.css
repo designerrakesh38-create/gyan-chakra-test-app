@@ -1053,9 +1053,89 @@ select:focus {
 
 .host-set-summary {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
   margin: 12px 0;
+}
+
+.admin-table-toolbar {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) auto auto auto;
+  gap: 10px;
+  align-items: center;
+  margin: 14px 0;
+}
+
+.admin-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #0f1726;
+}
+
+.admin-data-table {
+  width: 100%;
+  min-width: 920px;
+  border-collapse: collapse;
+  color: #edf0f7;
+}
+
+.admin-data-table th,
+.admin-data-table td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 14px 16px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.admin-data-table th {
+  color: #f4c85d;
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.admin-data-table td {
+  color: #d9deea;
+  font-weight: 750;
+}
+
+.admin-data-table td strong {
+  color: white;
+}
+
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.table-actions button,
+.admin-data-table td > button {
+  min-height: 32px;
+  padding: 0 9px;
+  box-shadow: none;
+  font-size: 12px;
+}
+
+.empty-table-row td {
+  color: #9da7bc;
+  font-weight: 800;
+}
+
+.module-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  margin: 18px 0;
+}
+
+.module-split h3 {
+  margin-bottom: 4px;
+}
+
+.module-split p {
+  margin-bottom: 10px;
 }
 
 .user-admin-summary {
@@ -1286,6 +1366,9 @@ select:focus {
   .admin-metrics,
   .admin-grid,
   .admin-command-strip,
+  .host-set-summary,
+  .module-split,
+  .admin-table-toolbar,
   .user-admin-summary,
   .user-filter-row,
   .user-detail-card {

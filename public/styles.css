@@ -1104,6 +1104,15 @@ select:focus {
   color: white;
 }
 
+.admin-data-table td small {
+  display: block;
+  margin-top: 5px;
+  color: #9da7bc;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 .table-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1267,6 +1276,16 @@ select:focus {
 .host-slot.empty {
   border-style: dashed;
   background: #fbfbfe;
+}
+
+#hostSlotManager {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+#hostSlotManager .managed-question {
+  margin: 0;
 }
 
 .host-date-group {

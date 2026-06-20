@@ -14,6 +14,7 @@ const state = {
   adminStats: null,
   userSearch: "",
   dailyContestSearch: "",
+  hostChallengeSearch: "",
   userDateFilter: "all",
   hostAlreadyQualified: false,
   hostAnswers: new Map(),
@@ -1276,6 +1277,66 @@ function hostSlotHtml(slot, question) {
   `;
 }
 
+function hostChallengeTableHtml(selected) {
+  const search = state.hostChallengeSearch.trim().toLowerCase();
+  const challengeTitle = `Play with Host - ${state.hostManageDate}`;
+  const matchesSearch = !search || challengeTitle.toLowerCase().includes(search) || selected.some(question => question.text.toLowerCase().includes(search));
+  if (!matchesSearch) {
+    return `<div class="result">No mega challenges match this search.</div>`;
+  }
+  const scheduledQuestions = selected.filter(question => question.scheduledAt);
+  const firstTime = scheduledQuestions.slice().sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))[0]?.scheduledAt || "";
+  const latestTime = scheduledQuestions.slice().sort((a, b) => new Date(b.scheduledAt) - new Date(a.scheduledAt))[0]?.scheduledAt || "";
+  const participants = state.hostAttemptRows.filter(attempt => questionDateKey({ scheduledAt: attempt.submittedAt }) === state.hostManageDate).length;
+  const shortlisted = state.hostAttemptRows.filter(attempt => questionDateKey({ scheduledAt: attempt.submittedAt }) === state.hostManageDate && attempt.shortlisted).length;
+  const complete = selected.length === 10;
+  const anyLive = selected.some(question => (!question.scheduledAt && question.status === "live") || (question.scheduledAt && new Date(question.scheduledAt) <= new Date()));
+  const status = !selected.length
+    ? { key: "draft", label: "Draft" }
+    : complete && anyLive
+      ? { key: "active", label: "Open" }
+      : complete
+        ? { key: "scheduled", label: "Scheduled" }
+        : { key: "draft", label: "Incomplete" };
+  return `
+    <div class="admin-table-wrap">
+      <table class="admin-data-table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Reward Pool</th>
+            <th>Start Date</th>
+            <th>End Date</th>
+            <th>Status</th>
+            <th>Participants</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <strong>${escapeHtml(challengeTitle)}</strong>
+              <small>${selected.length}/10 questions ready · ${shortlisted} all-correct shortlist</small>
+            </td>
+            <td>₹1,00,000 chance</td>
+            <td>${firstTime ? formatDateTime(firstTime) : "-"}</td>
+            <td>${latestTime ? formatDateTime(latestTime) : "-"}</td>
+            <td><span class="status-chip ${status.key}">${status.label}</span></td>
+            <td>${participants}</td>
+            <td>
+              <div class="table-actions">
+                <button type="button" data-open-host-builder="${state.hostManageDate}">${complete ? "Inspect Questions" : "Add Questions"}</button>
+                <button type="button" data-add-host-slot="${Math.min(selected.length + 1, 10)}">Add Question</button>
+                ${complete ? `<button type="button" data-schedule-host-date="${state.hostManageDate}">Schedule</button>` : ""}
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
 function selectedHostQuestions() {
   return state.allHostQuestions.filter(question => questionDateKey(question) === state.hostManageDate);
 }
@@ -1433,7 +1494,9 @@ function renderQuestionManagers() {
       <div><strong>${expiredCount}</strong><span>Expired</span></div>
       <div><strong>${selected.length === 10 ? "Ready" : "Incomplete"}</strong><span>Selected date status</span></div>
     `;
-    host.innerHTML = Array.from({ length: 10 }, (_, index) => hostSlotHtml(index + 1, selected[index])).join("");
+    host.innerHTML = hostChallengeTableHtml(selected);
+    const hostSlots = $("#hostSlotManager");
+    if (hostSlots) hostSlots.innerHTML = Array.from({ length: 10 }, (_, index) => hostSlotHtml(index + 1, selected[index])).join("");
     renderHostScheduleByDate();
   }
 }
@@ -1748,6 +1811,28 @@ document.addEventListener("click", async event => {
     showAdminView("host");
     return;
   }
+  const openHostBuilder = event.target.closest("[data-open-host-builder]");
+  if (openHostBuilder) {
+    state.hostManageDate = openHostBuilder.dataset.openHostBuilder || state.hostManageDate;
+    $("#hostDateSelect").value = state.hostManageDate;
+    showAdminView("host");
+    openHostBulkBuilder();
+    return;
+  }
+  const scheduleHostDate = event.target.closest("[data-schedule-host-date]");
+  if (scheduleHostDate) {
+    state.hostManageDate = scheduleHostDate.dataset.scheduleHostDate || state.hostManageDate;
+    $("#hostDateSelect").value = state.hostManageDate;
+    showAdminView("host");
+    const selected = selectedHostQuestions().find(question => question.scheduledAt);
+    if ($("#hostSetTime")) {
+      $("#hostSetTime").value = selected?.scheduledAt
+        ? new Date(selected.scheduledAt).toISOString().slice(0, 16)
+        : new Date(`${state.hostManageDate}T20:00:00`).toISOString().slice(0, 16);
+    }
+    toast("Set the live time, then click Schedule 10 Questions.");
+    return;
+  }
   const notify = event.target.closest("[data-notify-record]");
   if (notify) {
     try {
@@ -2025,6 +2110,11 @@ bind("#userSearchInput", "input", event => {
 
 bind("#dailyContestSearch", "input", event => {
   state.dailyContestSearch = event.target.value;
+  renderQuestionManagers();
+});
+
+bind("#hostChallengeSearch", "input", event => {
+  state.hostChallengeSearch = event.target.value;
   renderQuestionManagers();
 });
 

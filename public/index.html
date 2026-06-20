@@ -332,6 +332,12 @@ Patna</textarea></label>
                 <button id="todayHostDateBtn" type="button">Today</button>
                 <button id="tomorrowHostDateBtn" type="button">Tomorrow</button>
               </div>
+              <div class="admin-table-toolbar">
+                <input id="hostChallengeSearch" placeholder="Search mega challenges by date or question...">
+                <button class="outline-dark" type="button">Columns</button>
+                <button class="outline-dark" type="button">CSV</button>
+                <button class="outline-dark" type="button">Excel</button>
+              </div>
               <div id="hostSetSummary" class="host-set-summary"></div>
               <div class="host-set-actions">
                 <button id="addHostQuestionBtn" type="button">Add 10 Questions by Date</button>
@@ -359,6 +365,9 @@ Patna</textarea></label>
                 </div>
               </div>
               <div id="hostQuestionManager" class="results"></div>
+              <h3>Questions for Selected Date</h3>
+              <p>Open the editor from the table above, or use these 10 slots to reorder and adjust each question.</p>
+              <div id="hostSlotManager" class="results"></div>
               <div class="module-split">
                 <div>
                   <h3>Host Attempts</h3>
